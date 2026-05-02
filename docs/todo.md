@@ -23,10 +23,13 @@
 - [x] プロジェクト用 CLAUDE.md 作成
 - [x] てつてつとplan.mdの方針確認（A→B→C順・予算 $30 ・ハードストップ込み）
 - [x] AWS CLI 認証確認（識別情報は `~/.secrets/chicken-knowledge-rag.env`）
-- [ ] Gitリポジトリ初期化（`git init`）
-- [ ] GitHubリポジトリ作成（パブリック・Secret Scanning有効化）
-- [ ] `.gitignore` 設定（`.env` / `node_modules` / `.amplify` / `*.pem` 等）
-- [ ] `~/.secrets/chicken-knowledge-rag.env` 作成（必要時）
+- [x] `~/.secrets/chicken-knowledge-rag.env` 作成（権限600）
+- [x] `.gitignore` 設定（`.env` / `node_modules` / `.amplify` / `*.pem` 等）
+- [x] Gitリポジトリ初期化（`git init -b main`）
+- [x] Initial commit（chore）
+- [x] GitHubリポジトリ作成（パブリック）: `https://github.com/tetutetu214/chicken-knowledge-rag`
+- [x] Secret Scanning + Push Protection 有効化
+- [x] AWSアカウントID漏洩チェック（OK）
 
 ## Step 1: AWS環境準備（スコープA）
 
