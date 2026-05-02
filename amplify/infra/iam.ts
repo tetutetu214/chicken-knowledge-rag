@@ -22,8 +22,9 @@ export const createIamResources = (scope: Construct): IamResources => {
     // Budgets Actions が Lambda 実行ロールにアタッチして Bedrock 呼び出しを停止する
     const bedrockDenyPolicy = new iam.ManagedPolicy(scope, 'BedrockDenyPolicy', {
         managedPolicyName: 'chicken-rag-bedrock-deny',
+        // description プロパティは ASCII + Latin-1 のみ (IAM API制約) のため英語表記
         description:
-            '予算超過時にアタッチして Bedrock 呼び出し系 API を停止するポリシー',
+            'Deny Bedrock invocation APIs (hard-stop, attached when budget exceeded)',
         statements: [
             new iam.PolicyStatement({
                 sid: 'DenyBedrockInvocation',
@@ -49,7 +50,7 @@ export const createIamResources = (scope: Construct): IamResources => {
         roleName: 'chicken-rag-bedrock-kb-role',
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description:
-            'Bedrock Knowledge Base が S3 と Embedding モデルを呼ぶためのロール',
+            'Bedrock Knowledge Base service role for S3 and embedding model access',
     });
 
     // Lambda 実行ロール (Conversation Handler 用)
@@ -58,7 +59,7 @@ export const createIamResources = (scope: Construct): IamResources => {
         roleName: 'chicken-rag-lambda-role',
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
         description:
-            'Conversation Lambda の実行ロール (Bedrock 呼び出し用、ハードストップ対象)',
+            'Lambda execution role for Bedrock invocation (hard-stop target)',
         managedPolicies: [
             iam.ManagedPolicy.fromAwsManagedPolicyName(
                 'service-role/AWSLambdaBasicExecutionRole',
