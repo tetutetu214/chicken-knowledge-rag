@@ -43,11 +43,14 @@
 ## Step 1: AWS環境準備（スコープA）
 
 - [x] ap-northeast-1 リージョンで作業することを確認
-- [ ] AWS Budgets 作成: 月額 $30 上限（50%/80%/100% メールアラート）
-- [ ] AWS Budgets Actions 設定: 100%超過時に Bedrock呼び出しDenyポリシーを自動アタッチ（ハードストップ）
-- [ ] ハードストップ用 IAMポリシー作成: `bedrock:InvokeModel*` / `bedrock:Retrieve*` をDeny
-- [ ] IAMロール作成: Bedrock KB実行用
-- [ ] IAMロール作成: Lambda実行用（Step 4で利用）
+- [x] CDK Bootstrap 実行（孤児バケット削除込み）
+- [x] AWS Budgets 作成: 月額 $30 上限（ACTUAL 50%/80%/100% メールアラート）
+- [x] AWS Budgets Actions 設定: 100%超過時に Bedrock呼び出しDenyポリシーを自動アタッチ（STANDBY 状態で待機中）
+- [x] ハードストップ用 IAMポリシー作成: `chicken-rag-bedrock-deny`
+- [x] IAMロール作成: `chicken-rag-bedrock-kb-role` (Bedrock KB サービスロール)
+- [x] IAMロール作成: `chicken-rag-lambda-role` (Lambda実行ロール、ハードストップ対象)
+- [x] IAMロール作成: `chicken-rag-budget-action-role` (Budgets Actions 実行ロール)
+- [x] Amplify Sandbox デプロイ成功 (213秒、90リソース作成)
 - [ ] S3バケット作成: docs-bucket（公的マニュアル・論文の原本）
 - [ ] S3バケット作成: knowledge-bucket（現場ナレッジMarkdown / Phase 1.5で利用）
 - [ ] S3バケット作成: image-bucket（Phase 2で利用）

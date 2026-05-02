@@ -52,7 +52,7 @@ export const createBudgetWithHardStop = (
         roleName: 'chicken-rag-budget-action-role',
         assumedBy: new iam.ServicePrincipal('budgets.amazonaws.com'),
         description:
-            'AWS Budgets Actions が IAM ポリシーを Attach/Detach するためのロール',
+            'AWS Budgets Actions role for attaching / detaching IAM policies',
     });
     budgetActionRole.addToPolicy(
         new iam.PolicyStatement({
