@@ -1,0 +1,74 @@
+# 環境変数・シークレット（絶対にコミットしない）
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# AWS関連
+.aws-sam/
+samconfig.toml
+*.pem
+aws-credentials*
+aws-exports.js
+
+# AWS Amplify Gen2 生成物
+.amplify/
+amplify_outputs.json
+amplifyconfiguration.json
+amplify-build-config.json
+amplify/team-provider-info.json
+amplify/.config/
+src/aws-exports.js
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ログ・一時ファイル
+*.log
+*.tmp
+tmp/
+.cache/
+
+# テスト・カバレッジ
+coverage/
+.nyc_output/
+htmlcov/
+
+# ビルド成果物・一時PDF（取込用ドキュメントは別途S3へ）
+dist/
+*.zip
+downloads/
