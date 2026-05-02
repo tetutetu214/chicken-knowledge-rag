@@ -74,12 +74,16 @@
 
 ## Step 2: Bedrock KB作成（スコープA）
 
-- [ ] Bedrock コンソールから Quick create
-- [ ] バックエンドに S3 Vectors を選択
-- [ ] Embeddingモデル: Titan Text Embeddings V2（1024次元）
-- [ ] Hierarchical chunking設定（parent 1500 / child 300 / overlap 60）
-- [ ] データソース: docs-bucket を指定
-- [ ] チャンキング戦略はデータソース作成後変更不可のため設定値を再確認
+CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
+
+- [x] S3 Vectors VectorBucket 作成 (`chicken-rag-vectors-{accountId}-{region}`)
+- [x] S3 Vectors Index 作成 (1024d / cosine / float32 / `chicken-rag-index`)
+- [x] Embeddingモデル: Titan Text Embeddings V2（amazon.titan-embed-text-v2:0）
+- [x] Bedrock KB 作成 (S3_VECTORS バックエンド、Status: ACTIVE)
+- [x] Hierarchical chunking設定（parent 1500 / child 300 / overlap 60）
+- [x] データソース作成 (docsBucket、Status: AVAILABLE)
+- [x] KB Invoke Policy (`chicken-rag-kb-invoke`) を ManagedPolicy として独立化（race condition対策）
+- [x] sandbox再デプロイ成功 (差分82秒)
 
 ## Step 3: 初期ドキュメント取込（スコープA）
 
