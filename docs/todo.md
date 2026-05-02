@@ -66,11 +66,11 @@
 - [x] IAMロール作成: `chicken-rag-lambda-role` (Lambda実行ロール、ハードストップ対象)
 - [x] IAMロール作成: `chicken-rag-budget-action-role` (Budgets Actions 実行ロール)
 - [x] Amplify Sandbox デプロイ成功 (213秒、90リソース作成)
-- [ ] S3バケット作成: docs-bucket（公的マニュアル・論文の原本）
-- [ ] S3バケット作成: knowledge-bucket（現場ナレッジMarkdown / Phase 1.5で利用）
-- [ ] S3バケット作成: image-bucket（Phase 2で利用）
-- [ ] 全バケットの暗号化・パブリックアクセスブロック確認
-- [ ] Bedrock コンソールで Claude Sonnet 4.5 / Haiku 4.5 / Titan V2 のモデルアクセス有効化
+- [x] S3バケット作成: `chicken-rag-docs-{accountId}-{region}` (KBサービスロールに読取権限付与)
+- [x] S3バケット作成: `chicken-rag-knowledge-{accountId}-{region}` (Phase 1.5で利用)
+- [x] S3バケット作成: `chicken-rag-image-{accountId}-{region}` (Phase 2で利用)
+- [x] 全バケットの暗号化(AES256)・パブリックアクセスブロック・enforceSSL・バージョニング確認
+- [ ] Bedrock コンソールで Claude Sonnet 4.5 / Haiku 4.5 / Titan V2 のモデルアクセス有効化（てつてつ作業）
 
 ## Step 2: Bedrock KB作成（スコープA）
 
