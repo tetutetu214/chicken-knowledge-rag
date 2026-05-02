@@ -31,6 +31,15 @@
 - [x] Secret Scanning + Push Protection 有効化
 - [x] AWSアカウントID漏洩チェック（OK）
 
+## Step 0.5: Amplify Gen2 プロジェクト初期化（スコープA）
+
+- [x] `feature/aws-infrastructure-setup` ブランチ作成
+- [x] Node.js / npm バージョン確認（v20.20.1 / 10.8.2）
+- [x] `npm create amplify@latest -y` で雛形生成（約8分）
+- [x] amplify/backend.ts, auth/resource.ts, data/resource.ts 作成
+- [x] aws-cdk-lib 2.234.1 で S3 Vectors / Bedrock KB CDK サポート確認
+- [x] .gitignore マージ（Amplifyが amplify_outputs / amplifyconfiguration を追記）
+
 ## Step 1: AWS環境準備（スコープA）
 
 - [x] ap-northeast-1 リージョンで作業することを確認
