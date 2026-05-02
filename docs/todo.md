@@ -2,6 +2,21 @@
 
 最新状態を保つこと。完了したらチェックを入れて、必要なら新規タスクを追加する。詳細は `spec.md` §9 を参照。
 
+## 次回再開時のチェックリスト
+
+最終更新: 2026-05-02 22:15 (Step 1 IAM/Budget/ハードストップ デプロイ成功時点)
+
+1. **作業ブランチ**: `feature/aws-infrastructure-setup`（main 未マージ、3コミット済み）
+2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
+3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
+4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`（Cognito + AppSync + Todo + ChickenRagInfra）
+5. **次のタスク**: Step 1 残り（S3バケット 3種、Bedrock モデルアクセス有効化）→ Step 2（Bedrock KB + S3 Vectors）
+6. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
+7. **削除したい時**: `npx ampx sandbox delete`（対話確認あり）または CFn console で Stack 削除
+8. **既知の制約**: IAM description は ASCII + Latin-1 のみ（日本語NG）、env ファイルは export 必須
+
+
+
 ## 凡例
 
 - [ ] 未着手
