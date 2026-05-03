@@ -4,16 +4,23 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-02 22:15 (Step 1 IAM/Budget/ハードストップ デプロイ成功時点)
+最終更新: 2026-05-03 (v2.0 ペット飼育前提に改訂、スコープA+B+C完走後)
 
-1. **作業ブランチ**: `feature/aws-infrastructure-setup`（main 未マージ、3コミット済み）
+1. **作業ブランチ**: 現在 `docs/pivot-to-pet-domain` (このPRをマージ後は新ブランチで Phase 1.5 へ)
 2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
 3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
-4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`（Cognito + AppSync + Todo + ChickenRagInfra）
-5. **次のタスク**: Step 1 残り（S3バケット 3種、Bedrock モデルアクセス有効化）→ Step 2（Bedrock KB + S3 Vectors）
-6. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
-7. **削除したい時**: `npx ampx sandbox delete`（対話確認あり）または CFn console で Stack 削除
-8. **既知の制約**: IAM description は ASCII + Latin-1 のみ（日本語NG）、env ファイルは export 必須
+4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
+5. **既配備リソース**:
+   - Bedrock KB ID: 19S0LSZVPF (公的マニュアル7本取込済み)
+   - DataSource ID: AFSV7SCBAD
+   - Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`
+   - フロント: `web/` (Next.js 16、ローカル動作確認済み)
+6. **次のタスク（v2.0 ピボット後）**:
+   - 追加ドキュメント取込: 厚労省・自治体マニュアル (鳥獣被害対策、卵衛生)
+   - Phase 1.5: Cognito認証 + Amplify AI Kit + ナレッジ投稿フォーム + Hosting デプロイ
+7. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
+8. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
+9. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない
 
 
 
