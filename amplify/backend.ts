@@ -1,12 +1,14 @@
 import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
+import { chatHandler } from './functions/chat-handler/resource';
 import { createIamResources } from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
-import { createConversationApi } from './infra/api';
 
 /**
  * 環境変数から必須値を取得する。未設定なら明示的にエラーで止める。
@@ -32,6 +34,7 @@ const budgetLimitUsd = parseInt(requireEnv('BUDGET_MONTHLY_LIMIT_USD'), 10);
 const backend = defineBackend({
     auth,
     data,
+    chatHandler,
 });
 
 // CDK 拡張: IAM / Budget 等のインフラリソースを同じ Stack に追加
@@ -63,24 +66,55 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
         kbServiceRole,
     });
 
-// 会話 API (スコープB): Lambda + Function URL
+// 会話 API: AppSync Direct Lambda Resolver (Cognito 認証必須)
 // 回答生成モデルは JP Inference Profile (Claude Haiku 4.5、CRIS必須)
 const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
+const conversationModelId = 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
 const conversationModelArn =
-    `arn:aws:bedrock:${region}:${accountId}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0`;
+    `arn:aws:bedrock:${region}:${accountId}:inference-profile/${conversationModelId}`;
 
-const { fn: conversationFn, fnUrl: conversationFnUrl } = createConversationApi(
-    infraStack,
-    {
-        knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-        modelArn: conversationModelArn,
-        lambdaRole,
-    },
+// Amplify が生成した chat Lambda 実行ロールに、Bedrock KB / Inference Profile 呼び出し権限を追加する。
+// resources.lambda は IFunction として返るため、具象 Function 型に cast して addEnvironment を呼ぶ。
+const chatLambda = backend.chatHandler.resources.lambda as lambda.Function;
+chatLambda.addEnvironment('KNOWLEDGE_BASE_ID', knowledgeBase.attrKnowledgeBaseId);
+chatLambda.addEnvironment('MODEL_ARN', conversationModelArn);
+chatLambda.addEnvironment('MODEL_ID', conversationModelId);
+
+const chatLambdaRole = chatLambda.role;
+if (!chatLambdaRole) {
+    throw new Error('chatHandler の Lambda 実行ロールが未生成');
+}
+
+chatLambdaRole.addToPrincipalPolicy(
+    new iam.PolicyStatement({
+        sid: 'BedrockKnowledgeBaseQuery',
+        actions: ['bedrock:Retrieve', 'bedrock:RetrieveAndGenerate'],
+        resources: [
+            `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`,
+        ],
+    }),
 );
 
-// Lambda が KB の作成完了後に作成されるよう依存関係を追加
-conversationFn.node.addDependency(knowledgeBase);
+chatLambdaRole.addToPrincipalPolicy(
+    new iam.PolicyStatement({
+        sid: 'BedrockInferenceProfileInvoke',
+        actions: [
+            'bedrock:InvokeModel',
+            'bedrock:GetInferenceProfile',
+            'bedrock:UseInferenceProfile',
+        ],
+        resources: [
+            `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
+            `arn:aws:bedrock:${region}::foundation-model/*`,
+            // CRIS は他リージョンの foundation-model も呼ぶため広めに許可
+            'arn:aws:bedrock:*::foundation-model/*',
+        ],
+    }),
+);
+
+// chat Lambda が KB 作成後に呼び出せるよう依存関係を追加
+chatLambda.node.addDependency(knowledgeBase);
 
 // 後続 Step で参照する ARN を amplify_outputs.json に書き出す
 backend.addOutput({
@@ -95,7 +129,6 @@ backend.addOutput({
         vectorIndexArn: vectorIndex.attrIndexArn,
         knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
         dataSourceId: dataSource.attrDataSourceId,
-        conversationFunctionName: conversationFn.functionName,
-        conversationFunctionUrl: conversationFnUrl.url,
+        chatFunctionName: chatLambda.functionName,
     },
 });
