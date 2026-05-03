@@ -1,3 +1,4 @@
+import * as cdk from 'aws-cdk-lib';
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
@@ -5,6 +6,7 @@ import { createIamResources } from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
+import { createConversationApi } from './infra/api';
 
 /**
  * 環境変数から必須値を取得する。未設定なら明示的にエラーで止める。
@@ -61,6 +63,25 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
         kbServiceRole,
     });
 
+// 会話 API (スコープB): Lambda + Function URL
+// 回答生成モデルは JP Inference Profile (Claude Haiku 4.5、CRIS必須)
+const region = cdk.Stack.of(infraStack).region;
+const accountId = cdk.Stack.of(infraStack).account;
+const conversationModelArn =
+    `arn:aws:bedrock:${region}:${accountId}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0`;
+
+const { fn: conversationFn, fnUrl: conversationFnUrl } = createConversationApi(
+    infraStack,
+    {
+        knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+        modelArn: conversationModelArn,
+        lambdaRole,
+    },
+);
+
+// Lambda が KB の作成完了後に作成されるよう依存関係を追加
+conversationFn.node.addDependency(knowledgeBase);
+
 // 後続 Step で参照する ARN を amplify_outputs.json に書き出す
 backend.addOutput({
     custom: {
@@ -74,5 +95,7 @@ backend.addOutput({
         vectorIndexArn: vectorIndex.attrIndexArn,
         knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
         dataSourceId: dataSource.attrDataSourceId,
+        conversationFunctionName: conversationFn.functionName,
+        conversationFunctionUrl: conversationFnUrl.url,
     },
 });
