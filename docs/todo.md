@@ -118,13 +118,17 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ## Step 5: フロントエンド（スコープC / Phase 1.5）
 
-- [ ] Next.js App Router セットアップ（TypeScript）（スコープC）
-- [ ] 1スレッド限定の超簡易チャット画面（認証なし）（スコープC）← **スコープC 完了条件**
+- [x] Next.js 16 + Tailwind v4 + React 19 セットアップ（`web/` サブディレクトリ）
+- [x] 1スレッド限定の超簡易チャット画面（認証なし、Lambda Function URL を fetch）
+- [x] 引用元表示コンポーネント（ファイル名 + ページ番号）
+- [x] ダークモード対応（OS追従）
+- [x] Cmd/Ctrl+Enter 送信ショートカット
+- [x] Playwright + Chromium で E2E smoke test 3本（初期表示 / KB範囲内回答 / KB範囲外）
+- [x] 全テストpass（実ブラウザでの動作確認も完了）← **✅ スコープC 完了条件達成**
 - [ ] `<Authenticator>` で Cognito 認証（Phase 1.5）
 - [ ] Cognito User Pool に2名のユーザー登録（Phase 1.5）
 - [ ] `<AIConversation>` でマルチスレッドチャットUI（Phase 1.5）
 - [ ] スレッド一覧サイドバー実装（Phase 1.5）
-- [ ] 引用ソース表示コンポーネント実装（ドキュメント名・ページ番号）（Phase 1.5）
 - [ ] Amplify Hosting にデプロイ（Phase 1.5）
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
