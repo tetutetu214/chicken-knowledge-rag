@@ -103,11 +103,16 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ## Step 4: 会話バックエンド（スコープB / Phase 1.5）
 
-- [ ] Lambda + API Gateway で `retrieve_and_generate` を呼び出す最小実装（スコープB）
-- [ ] curl で API疎通確認（スコープB）← **スコープB 完了条件**
-- [ ] Amplify Gen2 プロジェクト初期化（`npm create amplify`）（Phase 1.5）
+- [x] Lambda (Python 3.12) + Function URL で `retrieve_and_generate` を呼び出す最小実装（スコープB）
+- [x] CDK拡張 (`amplify/infra/api.ts`) で Lambda + ManagedPolicy + Function URL 一括定義
+- [x] `lambda/conversation_handler/index.py` で Bedrock 呼び出し + 引用元抽出
+- [x] LambdaInvokePolicy: Retrieve / RetrieveAndGenerate / InvokeModel / GetInferenceProfile / UseInferenceProfile
+- [x] curl で API疎通確認 ← **✅ スコープB 完了条件達成**
+  - URL: Lambda Function URL（NONE 認証、CORS 許可）
+  - 質問→引用付き回答（鶏卵生産衛生管理ハンドブック p13 引用）
+- [x] Amplify Gen2 プロジェクト初期化（`npm create amplify`）（Step 0.5 で完了済み）
 - [ ] `amplify/data/resource.ts` に `a.conversation()` ルート定義（Phase 1.5）
-- [ ] Conversation Handler Lambda 実装（Phase 1.5）
+- [ ] Conversation Handler を AppSync 経由に切替（Phase 1.5）
 - [ ] DynamoDB スキーマ確認（PK/SK・TTL・ULID採用）（Phase 1.5）
 - [ ] EventBridge ルール作成（S3 ObjectCreated → StartIngestionJob）（Phase 1.5）
 
