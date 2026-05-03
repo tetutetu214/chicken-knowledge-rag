@@ -9,7 +9,6 @@ import { createIamResources } from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
-import { createConversationApi } from './infra/api';
 
 /**
  * 環境変数から必須値を取得する。未設定なら明示的にエラーで止める。
@@ -67,7 +66,7 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
         kbServiceRole,
     });
 
-// 会話 API: 旧 (スコープB) Lambda + Function URL と 新 (Phase 1.5 B-3) chat Resolver の両建て
+// 会話 API: AppSync Direct Lambda Resolver (Cognito 認証必須)
 // 回答生成モデルは JP Inference Profile (Claude Haiku 4.5、CRIS必須)
 const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
@@ -75,21 +74,7 @@ const conversationModelId = 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
 const conversationModelArn =
     `arn:aws:bedrock:${region}:${accountId}:inference-profile/${conversationModelId}`;
 
-// 旧: Lambda Function URL (NONE 認証)。Step 6 で削除予定、ロールバック容易のため一旦並走。
-const { fn: conversationFn, fnUrl: conversationFnUrl } = createConversationApi(
-    infraStack,
-    {
-        knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-        modelArn: conversationModelArn,
-        lambdaRole,
-    },
-);
-
-// Lambda が KB の作成完了後に作成されるよう依存関係を追加
-conversationFn.node.addDependency(knowledgeBase);
-
-// 新: AppSync Direct Lambda Resolver (Cognito 認証)。chat クエリの実体。
-// Amplify が生成した Lambda 実行ロールに、Bedrock KB / Inference Profile 呼び出し権限を追加する。
+// Amplify が生成した chat Lambda 実行ロールに、Bedrock KB / Inference Profile 呼び出し権限を追加する。
 // resources.lambda は IFunction として返るため、具象 Function 型に cast して addEnvironment を呼ぶ。
 const chatLambda = backend.chatHandler.resources.lambda as lambda.Function;
 chatLambda.addEnvironment('KNOWLEDGE_BASE_ID', knowledgeBase.attrKnowledgeBaseId);
@@ -144,8 +129,6 @@ backend.addOutput({
         vectorIndexArn: vectorIndex.attrIndexArn,
         knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
         dataSourceId: dataSource.attrDataSourceId,
-        conversationFunctionName: conversationFn.functionName,
-        conversationFunctionUrl: conversationFnUrl.url,
         chatFunctionName: chatLambda.functionName,
     },
 });
