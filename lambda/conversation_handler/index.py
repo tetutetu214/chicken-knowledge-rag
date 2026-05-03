@@ -27,12 +27,16 @@ def _build_response(
     status_code: int,
     body: dict[str, Any],
 ) -> dict[str, Any]:
-    """Lambda Function URL の標準レスポンス形式を組み立てる。"""
+    """Lambda Function URL の標準レスポンス形式を組み立てる。
+
+    Access-Control-Allow-Origin は Lambda Function URL の CORS 設定が
+    自動付与するため、ここで定義すると応答ヘッダーが重複してブラウザが
+    CORS エラーで fetch を失敗させる。Lambda コード側では Content-Type のみ。
+    """
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
         },
         "body": json.dumps(body, ensure_ascii=False),
     }
