@@ -72,3 +72,7 @@ htmlcov/
 dist/
 *.zip
 downloads/
+
+# amplify
+amplify_outputs*
+amplifyconfiguration*
