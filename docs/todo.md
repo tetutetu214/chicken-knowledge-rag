@@ -4,26 +4,27 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-03 (追加取込7本完了、KBは合計14本体制。次は Phase 1.5 Cognito 認証)
+最終更新: 2026-05-03 (Phase 1.5 B-1 Cognito 認証完了、ローカル動作確認済み。次は B-2 Lambda 認証強化 or B-3 AppSync 移行)
 
-1. **作業ブランチ**: 現在 `feature/add-pet-domain-docs` (このPRをマージ後は `feature/cognito-auth` で Phase 1.5 へ)
+1. **作業ブランチ**: 現在 `feature/cognito-auth` (このPRをマージ後は `feature/lambda-iam-auth` か `feature/appsync-conversation` で Phase 1.5 継続)
 2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
 3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
 4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
 5. **既配備リソース**:
-   - Bedrock KB ID: 19S0LSZVPF (**14本取込済み**: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
+   - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
    - DataSource ID: AFSV7SCBAD
-   - Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`
-   - フロント: `web/` (Next.js 16、ローカル動作確認済み)
-6. **次のタスク (Phase 1.5)**:
-   - **B-1**: Cognito 認証 (`<Authenticator>` を web/ に組み込み + 2名ユーザー登録) ← 次セッション最初
-   - **B-2**: Lambda Function URL の認証方式の検討 (NONE → AWS_IAM か AppSync 経由かを決定)
-   - **B-3**: AppSync + `a.conversation()` 移行 (マルチスレッドUI)
-   - **B-4**: ナレッジ投稿フォーム (Markdown エディタ + EventBridge → KB Ingestion)
-   - **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL)
-7. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
-8. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
-9. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可
+   - Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`（**現状 NONE 認証**、Hosting 公開前に強化要）
+   - **Cognito User Pool**: amplify_outputs.json の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
+   - フロント: `web/` (Next.js 16 + Authenticator、ローカル動作確認済み)
+6. **次のタスク (Phase 1.5 残り)**:
+   - **B-2**: Lambda Function URL の認証強化（NONE → AWS_IAM、SigV4 を Amplify 経由でフロントから付ける） ← 次セッション最初
+   - **B-3**: AppSync + `a.conversation()` 移行（マルチスレッドUI、DynamoDB 会話履歴）
+   - **B-4**: ナレッジ投稿フォーム（Markdown エディタ + EventBridge → KB Ingestion）
+   - **B-5**: Amplify Hosting にデプロイ（奥さんへの公開URL、B-2 完了が前提）
+7. **ローカル起動方法**: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
+8. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
+9. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
+10. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可、Next.js 16 起動時の lockfile 警告は機能影響なし（`web/next.config.ts` で `turbopack.root` 設定すれば消えるが今回は未対応）
 
 ## 凡例
 
@@ -148,11 +149,14 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] Cmd/Ctrl+Enter 送信ショートカット
 - [x] Playwright + Chromium で E2E smoke test 3本（初期表示 / KB範囲内回答 / KB範囲外）
 - [x] 全テストpass（実ブラウザでの動作確認も完了）← **✅ スコープC 完了条件達成**
-- [ ] `<Authenticator>` で Cognito 認証（Phase 1.5）
-- [ ] Cognito User Pool に2名のユーザー登録（Phase 1.5）
-- [ ] `<AIConversation>` でマルチスレッドチャットUI（Phase 1.5）
-- [ ] スレッド一覧サイドバー実装（Phase 1.5）
-- [ ] Amplify Hosting にデプロイ（Phase 1.5）
+- [x] `<Authenticator>` で Cognito 認証（Phase 1.5 B-1、2026-05-03）
+- [x] Cognito User Pool に2名のユーザー登録（admin-create-user で User1/User2 作成、CONFIRMED + 永続パスワード設定済み）
+- [x] Authenticator UI 日本語化（I18n.putVocabulariesForLanguage）+ サインアップ画面非表示（hideSignUp）
+- [x] Playwright smoke test を認証ガード前提に書き換え（既存3本は skip、新規「サインイン画面表示」1本追加 → 1 passed / 3 skipped）
+- [ ] Lambda Function URL の認証強化（NONE → AWS_IAM か AppSync 経由）（Phase 1.5 B-2）
+- [ ] `<AIConversation>` でマルチスレッドチャットUI（Phase 1.5 B-3）
+- [ ] スレッド一覧サイドバー実装（Phase 1.5 B-3）
+- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL）
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
 
