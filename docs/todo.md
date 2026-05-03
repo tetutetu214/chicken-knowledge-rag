@@ -4,27 +4,29 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-03 (Phase 1.5 B-1 Cognito 認証完了、ローカル動作確認済み。次は B-2 Lambda 認証強化 or B-3 AppSync 移行)
+最終更新: 2026-05-04 (Phase 1.5 B-3 前半完了、AppSync chat resolver で認証強化済み・1問1答UI動作確認済み。次は Step 6 旧 Lambda 削除 → PR、その後 B-3 後半マルチスレッド or B-4)
 
-1. **作業ブランチ**: 現在 `feature/cognito-auth` (このPRをマージ後は `feature/lambda-iam-auth` か `feature/appsync-conversation` で Phase 1.5 継続)
+1. **作業ブランチ**: 現在 `feature/appsync-conversation` (このPRをマージ後はマルチスレッドは別ブランチ `feature/multi-thread-ui` で B-3 後半着手)
 2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
 3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
 4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
 5. **既配備リソース**:
    - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
    - DataSource ID: AFSV7SCBAD
-   - Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`（**現状 NONE 認証**、Hosting 公開前に強化要）
+   - **AppSync GraphQL**: amplify_outputs.json の `data.url`（Cognito User Pool 認証必須、`chat(question)` クエリで Bedrock 呼び出し）
+   - **chat Lambda**: amplify_outputs.json の `custom.chatFunctionName` (TypeScript、Bedrock Retrieve→ヒット有無で RetrieveAndGenerate / Converse 分岐)
+   - 旧 Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`（**Step 6 で削除予定、現在は AppSync と並走**）
    - **Cognito User Pool**: amplify_outputs.json の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
-   - フロント: `web/` (Next.js 16 + Authenticator、ローカル動作確認済み)
+   - フロント: `web/` (Next.js 16 + Authenticator、AppSync `client.queries.chat()` 呼び出し、ローカル動作確認済み)
 6. **次のタスク (Phase 1.5 残り)**:
-   - **B-2**: Lambda Function URL の認証強化（NONE → AWS_IAM、SigV4 を Amplify 経由でフロントから付ける） ← 次セッション最初
-   - **B-3**: AppSync + `a.conversation()` 移行（マルチスレッドUI、DynamoDB 会話履歴）
+   - **Step 6 (進行中)**: 旧 Python Lambda + Function URL 削除 (`amplify/infra/api.ts`, `lambda/conversation_handler/`, backend.ts の関連箇所)
+   - **B-3 後半**: マルチスレッドUI (`a.model('Conversation', 'Message')` で履歴 + サイドバー、または `a.conversation()` 再検討)
    - **B-4**: ナレッジ投稿フォーム（Markdown エディタ + EventBridge → KB Ingestion）
-   - **B-5**: Amplify Hosting にデプロイ（奥さんへの公開URL、B-2 完了が前提）
+   - **B-5**: Amplify Hosting にデプロイ（奥さんへの公開URL、認証強化は B-3 前半で達成済み）
 7. **ローカル起動方法**: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
 8. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
 9. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
-10. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可、Next.js 16 起動時の lockfile 警告は機能影響なし（`web/next.config.ts` で `turbopack.root` 設定すれば消えるが今回は未対応）
+10. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可、Next.js 16 起動時の lockfile 警告は機能影響なし（`web/next.config.ts` で `turbopack.root` 設定すれば消えるが今回は未対応）、**S3 Vectors は閾値なしで top-K を必ず返すため Lambda 側でコサイン類似度 0.7 を閾値に振り分け** (knowledge.md 2026-05-04 参照)
 
 ## 凡例
 
@@ -135,10 +137,10 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - URL: Lambda Function URL（NONE 認証、CORS 許可）
   - 質問→引用付き回答（鶏卵生産衛生管理ハンドブック p13 引用）
 - [x] Amplify Gen2 プロジェクト初期化（`npm create amplify`）（Step 0.5 で完了済み）
-- [ ] `amplify/data/resource.ts` に `a.conversation()` ルート定義（Phase 1.5）
-- [ ] Conversation Handler を AppSync 経由に切替（Phase 1.5）
-- [ ] DynamoDB スキーマ確認（PK/SK・TTL・ULID採用）（Phase 1.5）
-- [ ] EventBridge ルール作成（S3 ObjectCreated → StartIngestionJob）（Phase 1.5）
+- [x] `amplify/data/resource.ts` に `a.query('chat')` ルート定義（Phase 1.5 B-3 前半、2026-05-04。当初 `a.conversation()` 予定だったが案Yに変更、knowledge.md 参照）
+- [x] Conversation Handler を AppSync 経由に切替（Phase 1.5 B-3 前半、2026-05-04。TypeScript Lambda + Direct Lambda Resolver）
+- [ ] DynamoDB スキーマ確認（PK/SK・TTL・ULID採用）（Phase 1.5 B-3 後半、マルチスレッド対応時）
+- [ ] EventBridge ルール作成（S3 ObjectCreated → StartIngestionJob）（Phase 1.5 B-4）
 
 ## Step 5: フロントエンド（スコープC / Phase 1.5）
 
@@ -153,10 +155,11 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] Cognito User Pool に2名のユーザー登録（admin-create-user で User1/User2 作成、CONFIRMED + 永続パスワード設定済み）
 - [x] Authenticator UI 日本語化（I18n.putVocabulariesForLanguage）+ サインアップ画面非表示（hideSignUp）
 - [x] Playwright smoke test を認証ガード前提に書き換え（既存3本は skip、新規「サインイン画面表示」1本追加 → 1 passed / 3 skipped）
-- [ ] Lambda Function URL の認証強化（NONE → AWS_IAM か AppSync 経由）（Phase 1.5 B-2）
-- [ ] `<AIConversation>` でマルチスレッドチャットUI（Phase 1.5 B-3）
-- [ ] スレッド一覧サイドバー実装（Phase 1.5 B-3）
-- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL）
+- [x] Lambda Function URL の認証強化（AppSync 経由 + Cognito User Pool）（Phase 1.5 B-3 前半、2026-05-04 完了。`generateClient<Schema>().queries.chat()` 経由で全リクエストが認証必須に）
+- [x] KBヒット有無による回答振り分け実装（cosine 類似度 >= 0.7 を閾値、未満は「⚠ 参考資料にはありません」+ LLM 一般知識回答、2026-05-04）
+- [ ] マルチスレッドチャットUI（Phase 1.5 B-3 後半、`a.model('Conversation', 'Message')` または `a.conversation()` 再検討）
+- [ ] スレッド一覧サイドバー実装（Phase 1.5 B-3 後半）
+- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL、認証強化は前半完了済み）
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
 
