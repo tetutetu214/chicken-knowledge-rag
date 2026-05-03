@@ -2,6 +2,21 @@
 
 最新状態を保つこと。完了したらチェックを入れて、必要なら新規タスクを追加する。詳細は `spec.md` §9 を参照。
 
+## 次回再開時のチェックリスト
+
+最終更新: 2026-05-02 22:15 (Step 1 IAM/Budget/ハードストップ デプロイ成功時点)
+
+1. **作業ブランチ**: `feature/aws-infrastructure-setup`（main 未マージ、3コミット済み）
+2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
+3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
+4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`（Cognito + AppSync + Todo + ChickenRagInfra）
+5. **次のタスク**: Step 1 残り（S3バケット 3種、Bedrock モデルアクセス有効化）→ Step 2（Bedrock KB + S3 Vectors）
+6. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
+7. **削除したい時**: `npx ampx sandbox delete`（対話確認あり）または CFn console で Stack 削除
+8. **既知の制約**: IAM description は ASCII + Latin-1 のみ（日本語NG）、env ファイルは export 必須
+
+
+
 ## 凡例
 
 - [ ] 未着手
@@ -31,38 +46,58 @@
 - [x] Secret Scanning + Push Protection 有効化
 - [x] AWSアカウントID漏洩チェック（OK）
 
+## Step 0.5: Amplify Gen2 プロジェクト初期化（スコープA）
+
+- [x] `feature/aws-infrastructure-setup` ブランチ作成
+- [x] Node.js / npm バージョン確認（v20.20.1 / 10.8.2）
+- [x] `npm create amplify@latest -y` で雛形生成（約8分）
+- [x] amplify/backend.ts, auth/resource.ts, data/resource.ts 作成
+- [x] aws-cdk-lib 2.234.1 で S3 Vectors / Bedrock KB CDK サポート確認
+- [x] .gitignore マージ（Amplifyが amplify_outputs / amplifyconfiguration を追記）
+
 ## Step 1: AWS環境準備（スコープA）
 
 - [x] ap-northeast-1 リージョンで作業することを確認
-- [ ] AWS Budgets 作成: 月額 $30 上限（50%/80%/100% メールアラート）
-- [ ] AWS Budgets Actions 設定: 100%超過時に Bedrock呼び出しDenyポリシーを自動アタッチ（ハードストップ）
-- [ ] ハードストップ用 IAMポリシー作成: `bedrock:InvokeModel*` / `bedrock:Retrieve*` をDeny
-- [ ] IAMロール作成: Bedrock KB実行用
-- [ ] IAMロール作成: Lambda実行用（Step 4で利用）
-- [ ] S3バケット作成: docs-bucket（公的マニュアル・論文の原本）
-- [ ] S3バケット作成: knowledge-bucket（現場ナレッジMarkdown / Phase 1.5で利用）
-- [ ] S3バケット作成: image-bucket（Phase 2で利用）
-- [ ] 全バケットの暗号化・パブリックアクセスブロック確認
-- [ ] Bedrock コンソールで Claude Sonnet 4.5 / Haiku 4.5 / Titan V2 のモデルアクセス有効化
+- [x] CDK Bootstrap 実行（孤児バケット削除込み）
+- [x] AWS Budgets 作成: 月額 $30 上限（ACTUAL 50%/80%/100% メールアラート）
+- [x] AWS Budgets Actions 設定: 100%超過時に Bedrock呼び出しDenyポリシーを自動アタッチ（STANDBY 状態で待機中）
+- [x] ハードストップ用 IAMポリシー作成: `chicken-rag-bedrock-deny`
+- [x] IAMロール作成: `chicken-rag-bedrock-kb-role` (Bedrock KB サービスロール)
+- [x] IAMロール作成: `chicken-rag-lambda-role` (Lambda実行ロール、ハードストップ対象)
+- [x] IAMロール作成: `chicken-rag-budget-action-role` (Budgets Actions 実行ロール)
+- [x] Amplify Sandbox デプロイ成功 (213秒、90リソース作成)
+- [x] S3バケット作成: `chicken-rag-docs-{accountId}-{region}` (KBサービスロールに読取権限付与)
+- [x] S3バケット作成: `chicken-rag-knowledge-{accountId}-{region}` (Phase 1.5で利用)
+- [x] S3バケット作成: `chicken-rag-image-{accountId}-{region}` (Phase 2で利用)
+- [x] 全バケットの暗号化(AES256)・パブリックアクセスブロック・enforceSSL・バージョニング確認
+- [ ] Bedrock コンソールで Claude Sonnet 4.5 / Haiku 4.5 / Titan V2 のモデルアクセス有効化（てつてつ作業）
 
 ## Step 2: Bedrock KB作成（スコープA）
 
-- [ ] Bedrock コンソールから Quick create
-- [ ] バックエンドに S3 Vectors を選択
-- [ ] Embeddingモデル: Titan Text Embeddings V2（1024次元）
-- [ ] Hierarchical chunking設定（parent 1500 / child 300 / overlap 60）
-- [ ] データソース: docs-bucket を指定
-- [ ] チャンキング戦略はデータソース作成後変更不可のため設定値を再確認
+CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
+
+- [x] S3 Vectors VectorBucket 作成 (`chicken-rag-vectors-{accountId}-{region}`)
+- [x] S3 Vectors Index 作成 (1024d / cosine / float32 / `chicken-rag-index`)
+- [x] Embeddingモデル: Titan Text Embeddings V2（amazon.titan-embed-text-v2:0）
+- [x] Bedrock KB 作成 (S3_VECTORS バックエンド、Status: ACTIVE)
+- [x] Hierarchical chunking設定（parent 1500 / child 300 / overlap 60）
+- [x] データソース作成 (docsBucket、Status: AVAILABLE)
+- [x] KB Invoke Policy (`chicken-rag-kb-invoke`) を ManagedPolicy として独立化（race condition対策）
+- [x] sandbox再デプロイ成功 (差分82秒)
 
 ## Step 3: 初期ドキュメント取込（スコープA）
 
-- [ ] 飼養衛生管理基準（鶏）令和7年9月版 ダウンロード・S3アップロード
-- [ ] 高病原性鳥インフルエンザ防疫指針 令和7年10月版 ダウンロード・S3アップロード
-- [ ] AW指針（採卵鶏編）令和5年7月 ダウンロード・S3アップロード
-- [ ] 鶏卵生産衛生管理ハンドブック ダウンロード・S3アップロード
-- [ ] 採卵鶏の一般的衛生管理マニュアル ダウンロード・S3アップロード
-- [ ] StartIngestionJob 実行
-- [ ] AWS Console のテスト機能で引用付き回答が返ることを確認 ← **スコープA 完了条件**
+- [ ] 飼養衛生管理基準（鶏）令和7年9月版 ダウンロード・S3アップロード（PDF直リンク調査要）
+- [ ] 高病原性鳥インフルエンザ防疫指針 令和7年10月版 ダウンロード・S3アップロード（PDF直リンク調査要）
+- [ ] AW指針（採卵鶏編）令和5年7月 ダウンロード・S3アップロード（PDF直リンク調査要）
+- [x] 鶏卵生産衛生管理ハンドブック ダウンロード・S3アップロード（1.3MB）
+- [x] 採卵鶏HACCP衛生管理マニュアル ダウンロード・S3アップロード（284KB / 10ページ）
+- [x] StartIngestionJob 実行（KB再作成後、新KB ID: 19S0LSZVPF / DS ID: AFSV7SCBAD）
+- [x] Ingestion COMPLETE（2/2 documents indexed、約1分）
+- [x] CLI `retrieve-and-generate` で引用付き回答が返ることを確認 ← **✅ スコープA 完了条件達成**
+  - 質問: "採卵鶏の衛生管理で重要なポイントを教えて"
+  - 引用元: `鶏卵生産衛生管理ハンドブック.pdf` page 4 / 9
+  - モデル: `jp.anthropic.claude-haiku-4-5-20251001-v1:0` (Inference Profile)
 
 ## Step 4: 会話バックエンド（スコープB / Phase 1.5）
 
