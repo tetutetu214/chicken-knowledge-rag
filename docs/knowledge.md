@@ -242,6 +242,44 @@
 - ナレッジ投稿フォームのMarkdownエディタ選定（react-md-editor / @uiw/react-md-editor / その他の比較が必要、Phase 1.5で判断）
 - AWS Budgets Actions のハードストップ対象IAMロール/ユーザーの最終決定（Step 1で決める）
 
+### 2026-05-04: B-3 は AppSync `a.query()` (Direct Lambda Resolver) で実装、`a.conversation()` は見送り
+
+- **決定**: 当初計画では Amplify AI Kit の `a.conversation()` でマルチスレッド + 履歴 + UI を一括実装する予定だったが、案Y (= `a.query('chat')` で 1問1答 API、AppSync Lambda Resolver の Amplify Gen2 ラッパー) を採用。マルチスレッドUI は別タスク (B-3 後半) に切り出す。
+- **理由**:
+  1. KB を必ず引かせるカスタムハンドラ (`defineConversationHandlerFunction`) は公式ドキュメントが薄く、特に Lambda が受け取る event 型・メッセージ履歴の自前取得が複雑で実装に時間がかかる
+  2. 「Hosting 公開前の認証強化」が最優先で、まずそこを確実に達成する必要がある
+  3. `a.query()` は AWS AppSync Lambda Resolver チュートリアル(https://docs.aws.amazon.com/appsync/latest/devguide/tutorial-lambda-resolvers.html) と同じ仕組みの Amplify Gen2 ラッパーで、CDK が GraphQL スキーマ・IAM・Cognito Authorizer を自動生成
+  4. 既存 Python Lambda の Bedrock 呼び出しロジックを TypeScript に移植するだけで済み、debug 容易
+- **採用構成**:
+  - `amplify/functions/chat-handler/` に TypeScript Lambda (handler.ts + resource.ts)
+  - `amplify/data/resource.ts` で `a.query('chat')` + `allow.authenticated()` (Cognito User Pool 認証必須)
+  - `defaultAuthorizationMode: 'userPool'` に変更 (識別Pool → User Pool)
+  - `web/app/page.tsx` は `generateClient<Schema>().queries.chat({question})` で呼び出し
+- **トレードオフ**: マルチスレッドUI が今回スコープ外。todo の B-3 後半で別ブランチ対応。
+- **代案として検討した選択肢**:
+  - α (Tool Use): `a.conversation()` の `tools` で KB Tool 登録 → LLM が判断して呼ぶ。ただし「KB を引かない判断」をされるリスクが残る (spec §5-2 の精度最優先と相性悪)
+  - β (Custom Handler): `a.conversation()` + `defineConversationHandlerFunction`。KB必須化できるが上記の通りドキュメント薄
+  - 案Y (採用): `a.query()` で1問1答。マルチスレッド以外すべて達成
+
+### 2026-05-04: KB ヒット判定はコサイン類似度スコア >= 0.7 で振り分け
+
+- **決定**: chat handler の Lambda 内で `BedrockAgentRuntime.RetrieveCommand` を機械的に必ず実行し、`retrievalResults[].score` の最大値が **0.7 以上** ならば「KB根拠あり」、未満なら「KB根拠なし → ⚠ 表示 + LLM 一般知識回答」に振り分ける。
+- **背景**: S3 Vectors は閾値なしで top-K (5件) を必ず返す仕様のため、`results.length > 0` で判定すると **完全に無関連な質問でも常に「KB根拠あり」になる** バグが発生した (実初回確認時)。
+- **実測スコア分布** (Titan V2 1024d cosine):
+  - 真の関連質問「採卵鶏の衛生管理で重要なポイント」 → top **0.8747**
+  - 鶏ワード共通の無関連質問「鶏の鳴き声を音楽にしたい」 → top **0.6606**
+  - 差分: 約 0.21、中間値の 0.7 を閾値に設定
+- **理由**: KB が鶏関連文書ばかりなので「鶏」というキーワード単独で類似度が底上げされる。閾値 0.5 では振り分けが効かず、0.7 で実用範囲。
+- **将来の調整候補**: より厳しくしたい場合は 0.75、より拾いたい場合は 0.65。CloudWatch Logs (`KB retrieve scores: ... topScore: ...`) で実値を見ながら継続調整。
+- **トレードオフ**: 単一の数値閾値なので「鶏症状の質問だが KB に該当文書なし」のような微妙なケースは取りこぼす可能性あり。Phase 1.5 後半の精度チューニング (Step 7) でリランカー導入や閾値再評価を行う。
+
+### 2026-05-04: KB ヒットなし時は冒頭に「⚠ 参考資料にはありません。一般的な知識ですが、」を強制付与
+
+- **決定**: KB が引けなかった質問は、`Bedrock Converse API` で Sonnet 4.5 (実装は Haiku 4.5 Inference Profile を流用) を直接呼び、systemPrompt で「回答冒頭に必ず⚠表示を付ける」と強制する。
+- **理由**: spec §5-2 の「ハルシネーション抑制最優先・出典必須」を踏まえつつ、てつてつの設計判断「該当なしなら LLM が一般知識で答えればいい」を採用。ただしユーザーが「これは KB 根拠なし回答」と一目で識別できるよう ⚠ を強制表示。
+- **副作用**: フロント側で `hasKbResults` boolean を見て UI 色を緑/アンバーに分けることで、テキスト冒頭の ⚠ と組み合わせて2重に明示している。
+- **systemPrompt 抜粋**: 「疾病・薬剤・緊急対応・害獣捕獲・卵食品安全に関する内容を含む場合は『専門家に相談してください』を末尾に必ず添えること」。Phase 1.5 後半の Bedrock Guardrails 設定 (Step 7) と組み合わせて二重防御を予定。
+
 ---
 
 ## 参考情報のメモ
