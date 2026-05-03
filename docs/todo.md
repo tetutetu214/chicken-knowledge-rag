@@ -4,25 +4,26 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-03 (v2.0 ペット飼育前提に改訂、スコープA+B+C完走後)
+最終更新: 2026-05-03 (追加取込7本完了、KBは合計14本体制。次は Phase 1.5 Cognito 認証)
 
-1. **作業ブランチ**: 現在 `docs/pivot-to-pet-domain` (このPRをマージ後は新ブランチで Phase 1.5 へ)
+1. **作業ブランチ**: 現在 `feature/add-pet-domain-docs` (このPRをマージ後は `feature/cognito-auth` で Phase 1.5 へ)
 2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
 3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
 4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
 5. **既配備リソース**:
-   - Bedrock KB ID: 19S0LSZVPF (公的マニュアル7本取込済み)
+   - Bedrock KB ID: 19S0LSZVPF (**14本取込済み**: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
    - DataSource ID: AFSV7SCBAD
    - Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`
    - フロント: `web/` (Next.js 16、ローカル動作確認済み)
-6. **次のタスク（v2.0 ピボット後）**:
-   - 追加ドキュメント取込: 厚労省・自治体マニュアル (鳥獣被害対策、卵衛生)
-   - Phase 1.5: Cognito認証 + Amplify AI Kit + ナレッジ投稿フォーム + Hosting デプロイ
+6. **次のタスク (Phase 1.5)**:
+   - **B-1**: Cognito 認証 (`<Authenticator>` を web/ に組み込み + 2名ユーザー登録) ← 次セッション最初
+   - **B-2**: Lambda Function URL の認証方式の検討 (NONE → AWS_IAM か AppSync 経由かを決定)
+   - **B-3**: AppSync + `a.conversation()` 移行 (マルチスレッドUI)
+   - **B-4**: ナレッジ投稿フォーム (Markdown エディタ + EventBridge → KB Ingestion)
+   - **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL)
 7. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
 8. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
-9. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない
-
-
+9. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可
 
 ## 凡例
 
@@ -108,6 +109,21 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - 質問2: "鳥インフルエンザの感染拡大防止のために最低限すべきことを教えて" → HPAI防疫指針本体/資料2 p25 引用
   - モデル: `jp.anthropic.claude-haiku-4-5-20251001-v1:0` (Inference Profile)
 
+### 2026-05-03 追加取込（v2.0 ペット飼育前提カバレッジ拡張）
+
+- [x] サルモネラ食中毒予防_厚労省広報.pdf（617KB、家庭での卵食品安全）
+- [x] 鶏卵選別包装施設HACCP手引書_厚労省.pdf（1.3MB、on egg / in egg 汚染経路）
+- [x] 野生鳥獣被害防止マニュアル_中型獣類編_令和5年.pdf（10.5MB、農水省、アライグマ・ハクビシン・タヌキ・アナグマ）
+- [x] 鳥獣保護管理基本指針_環境省.pdf（248KB、鳥獣保護管理法の基本指針）
+- [x] 神奈川県_アライグマハクビシン対策パンフ.pdf（8KB、県レベル対策）
+- [x] 神奈川県_第4次アライグマ防除実施計画.pdf（4.7MB、市町村届出ベース捕獲の根拠）
+- [x] 神奈川県_食痕被害痕の見分け方.pdf（147KB、加害動物の特定）
+- [x] StartIngestionJob 実行（JobId: V4I8KBQHRT、新規7件のみ index 化、約1分でCOMPLETE）
+- [x] CLI `retrieve-and-generate` で引用付き回答を確認（KBは合計14ドキュメント体制）
+  - 質問1: "ハクビシンが鶏小屋の周りで目撃された場合の対処" → ⚠ 既存ハンドブックのみ引用、中型獣類編が引かれず（Phase 1.5の retrieval チューニング課題として記録）
+  - 質問2: "鶏卵の家庭保存とサルモネラ予防" → 新規 鶏卵HACCP手引書 + 既存ハンドブック引用 ✅
+  - 質問3: "神奈川県でアライグマを捕獲する手続き" → 神奈川県第4次アライグマ防除実施計画から3引用 ✅
+
 ## Step 4: 会話バックエンド（スコープB / Phase 1.5）
 
 - [x] Lambda (Python 3.12) + Function URL で `retrieve_and_generate` を呼び出す最小実装（スコープB）
@@ -148,11 +164,13 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ## Step 7: 精度チューニング（運用フェーズ）
 
-- [ ] Bedrock Guardrails 設定（疾病・薬剤・緊急対応カテゴリ）
+- [ ] Bedrock Guardrails 設定（疾病・薬剤・緊急対応・卵食品安全・害獣捕獲カテゴリ、spec.md §5-2 の6カテゴリ）
 - [ ] 専門家確認アラートのカスタムレスポンス設定
 - [ ] システムプロンプト実装（コンテキスト限定回答ポリシー）
 - [ ] RAGAS評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall）
 - [ ] ベースラインスコア取得
+- [ ] 中型獣類編が「ハクビシン」質問で retrieval されない件の調査（chunk size の見直し or `numberOfResults` 増 or リランカー導入）
+- [ ] PDF メタデータ sidecar 戦略の決定（現状は sidecar 無し、source_type / category を付与するか Phase 1.5 で再設計）
 
 ## Step 8: 運用・拡張
 
