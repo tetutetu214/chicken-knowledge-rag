@@ -4,29 +4,54 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-04 (Phase 1.5 B-3 前半完了、AppSync chat resolver で認証強化済み・1問1答UI動作確認済み。次は Step 6 旧 Lambda 削除 → PR、その後 B-3 後半マルチスレッド or B-4)
+最終更新: 2026-05-04 (Phase 1.5 B-3 前半 完了。AppSync chat resolver + Cognito 認証必須化 + 旧 Lambda 撤去まで完了。**PR #9 オープン中・レビュー待ち**)
 
-1. **作業ブランチ**: 現在 `feature/appsync-conversation` (このPRをマージ後はマルチスレッドは別ブランチ `feature/multi-thread-ui` で B-3 後半着手)
-2. **環境変数のロード**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須、子プロセス用に export 済み）
-3. **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
-4. **既デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
-5. **既配備リソース**:
-   - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
-   - DataSource ID: AFSV7SCBAD
-   - **AppSync GraphQL**: amplify_outputs.json の `data.url`（Cognito User Pool 認証必須、`chat(question)` クエリで Bedrock 呼び出し）
-   - **chat Lambda**: amplify_outputs.json の `custom.chatFunctionName` (TypeScript、Bedrock Retrieve→ヒット有無で RetrieveAndGenerate / Converse 分岐)
-   - 旧 Lambda Function URL: amplify_outputs.json の `custom.conversationFunctionUrl`（**Step 6 で削除予定、現在は AppSync と並走**）
-   - **Cognito User Pool**: amplify_outputs.json の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
-   - フロント: `web/` (Next.js 16 + Authenticator、AppSync `client.queries.chat()` 呼び出し、ローカル動作確認済み)
-6. **次のタスク (Phase 1.5 残り)**:
-   - **Step 6 (進行中)**: 旧 Python Lambda + Function URL 削除 (`amplify/infra/api.ts`, `lambda/conversation_handler/`, backend.ts の関連箇所)
-   - **B-3 後半**: マルチスレッドUI (`a.model('Conversation', 'Message')` で履歴 + サイドバー、または `a.conversation()` 再検討)
-   - **B-4**: ナレッジ投稿フォーム（Markdown エディタ + EventBridge → KB Ingestion）
-   - **B-5**: Amplify Hosting にデプロイ（奥さんへの公開URL、認証強化は B-3 前半で達成済み）
-7. **ローカル起動方法**: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
-8. **再デプロイ方法**: コード変更後に `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
-9. **削除したい時**: `npx ampx sandbox delete` または CFn console で Stack 削除
-10. **既知の制約**: IAM description は ASCII + Latin-1 のみ、env ファイルは export 必須、Lambda URL の CORS は Function URL 設定に任せ Lambda コード側でヘッダー追加しない、MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可、Next.js 16 起動時の lockfile 警告は機能影響なし（`web/next.config.ts` で `turbopack.root` 設定すれば消えるが今回は未対応）、**S3 Vectors は閾値なしで top-K を必ず返すため Lambda 側でコサイン類似度 0.7 を閾値に振り分け** (knowledge.md 2026-05-04 参照)
+### 次回セッション開始時にやること
+
+1. **PR #9 を確認・マージ** — https://github.com/tetutetu214/chicken-knowledge-rag/pull/9
+   - レビュー観点: 認証強化 / KB 必須化 / 旧 Lambda 削除の3点
+   - マージ後: `git switch main && git pull` で main を最新化、`feature/appsync-conversation` ブランチは削除可
+2. **次の着手対象を選ぶ** (どれから着手するかは てつてつ判断):
+   - (a) **B-3 後半**: マルチスレッドUI 実装 ← 当初要件、新ブランチ `feature/multi-thread-ui`
+   - (b) **B-4**: ナレッジ投稿フォーム ← `feature/knowledge-form`
+   - (c) **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL) ← 認証強化済みなので可能
+3. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
+
+### 現在の構成スナップショット
+
+- **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
+- **デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
+- **配備リソース**:
+  - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
+  - DataSource ID: AFSV7SCBAD
+  - **AppSync GraphQL**: `amplify_outputs.json` の `data.url`（Cognito User Pool 認証必須、`chat(question)` クエリで Bedrock 呼び出し）
+  - **chat Lambda**: `amplify_outputs.json` の `custom.chatFunctionName` (TypeScript、Bedrock Retrieve → 類似度 ≥ 0.7 で RetrieveAndGenerate / 未満で Converse 分岐)
+  - **Cognito User Pool**: `amplify_outputs.json` の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
+  - フロント: `web/` (Next.js 16 + Authenticator + AppSync 経由 `client.queries.chat()` 呼び出し)
+
+### 主要コマンド
+
+- ローカル起動: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
+- 再デプロイ: `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
+- 全削除: `npx ampx sandbox delete` または CFn console で Stack 削除
+
+### B-3 後半 (マルチスレッドUI) の検討メモ
+
+着手時に以下を最初に決める必要あり:
+
+1. **データモデル方針**: `a.model('Conversation', 'Message')` で自前定義 vs `a.conversation()` の再検討 (defineConversationHandlerFunction の実装難度を改めて評価)
+2. **DynamoDB スキーマ**: PK=`USER#{userId}` / SK=`CONV#{ulid}` または `MSG#{convId}#{ulid}`、TTL 90日
+3. **UI**: スレッド一覧サイドバー + チャット領域、Conversation の create/list/delete の API
+4. **既存 1問1答の互換**: B-3 前半のシンプル UI から段階移行するか、丸ごと差し替えるか
+
+### 既知の制約 (重要)
+
+- IAM description は ASCII + Latin-1 のみ
+- env ファイルは `export` 必須 (子プロセス用)
+- MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可
+- Next.js 16 起動時の lockfile 警告は機能影響なし (`web/next.config.ts` で `turbopack.root` 設定で消せるが未対応)
+- **S3 Vectors は閾値なしで top-K を必ず返す** → Lambda 側でコサイン類似度 0.7 を閾値に振り分け (knowledge.md 2026-05-04 参照)
+- AI Kit の `defineConversationHandlerFunction` は公式ドキュメントが薄く、event 型・履歴取得が複雑 (B-3 前半で a.query 採用の理由)
 
 ## 凡例
 
