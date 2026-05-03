@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 
 interface Citation {
     uri: string;
@@ -17,6 +18,7 @@ interface QAPair {
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Home() {
+    const { user, signOut } = useAuthenticator((context) => [context.user]);
     const [question, setQuestion] = useState('');
     const [history, setHistory] = useState<QAPair[]>([]);
     const [loading, setLoading] = useState(false);
@@ -86,13 +88,24 @@ export default function Home() {
     return (
         <main className="min-h-screen bg-zinc-50 dark:bg-zinc-900 px-4 py-6">
             <div className="max-w-3xl mx-auto">
-                <header className="mb-8">
-                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-                        🐓 Chicken Knowledge RAG
-                    </h1>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                        採卵鶏の飼育に特化したRAGエージェント (PoC・1スレッド限定)
-                    </p>
+                <header className="mb-8 flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+                            🐓 Chicken Knowledge RAG
+                        </h1>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                            ペット鶏150羽との暮らしを支援するRAGエージェント (PoC・1スレッド限定)
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-zinc-600 dark:text-zinc-400">
+                        <span>{user?.signInDetails?.loginId ?? user?.username}</span>
+                        <button
+                            onClick={signOut}
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                            サインアウト
+                        </button>
+                    </div>
                 </header>
 
                 <div className="space-y-4 mb-6">
