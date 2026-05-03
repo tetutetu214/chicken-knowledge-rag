@@ -73,6 +73,9 @@ dist/
 *.zip
 downloads/
 
+# アーキテクチャ図（draw.io）はローカル管理（必要に応じてPNGをエクスポートしてcommit）
+docs/*.drawio
+
 # amplify
 amplify_outputs*
 amplifyconfiguration*
