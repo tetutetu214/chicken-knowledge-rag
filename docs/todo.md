@@ -87,16 +87,18 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ## Step 3: 初期ドキュメント取込（スコープA）
 
-- [ ] 飼養衛生管理基準（鶏）令和7年9月版 ダウンロード・S3アップロード（PDF直リンク調査要）
-- [ ] 高病原性鳥インフルエンザ防疫指針 令和7年10月版 ダウンロード・S3アップロード（PDF直リンク調査要）
-- [ ] AW指針（採卵鶏編）令和5年7月 ダウンロード・S3アップロード（PDF直リンク調査要）
+- [x] 飼養衛生管理基準（鶏）ダウンロード・S3アップロード（798KB、`飼養衛生管理基準_鶏.pdf`）
+- [x] HPAI防疫指針 本体 ダウンロード・S3アップロード（1.5MB、index-75）
+- [x] HPAI防疫指針 資料1 ダウンロード・S3アップロード（1.1MB、index-76）
+- [x] HPAI防疫指針 資料2 ダウンロード・S3アップロード（655KB、index-77）
+- [x] AW指針（採卵鶏編）ダウンロード・S3アップロード（400KB、令和5年7月版）
 - [x] 鶏卵生産衛生管理ハンドブック ダウンロード・S3アップロード（1.3MB）
 - [x] 採卵鶏HACCP衛生管理マニュアル ダウンロード・S3アップロード（284KB / 10ページ）
-- [x] StartIngestionJob 実行（KB再作成後、新KB ID: 19S0LSZVPF / DS ID: AFSV7SCBAD）
-- [x] Ingestion COMPLETE（2/2 documents indexed、約1分）
+- [x] StartIngestionJob 実行（KB ID: 19S0LSZVPF / DS ID: AFSV7SCBAD）
+- [x] Ingestion COMPLETE（7/7 documents indexed、追加分は約1分）
 - [x] CLI `retrieve-and-generate` で引用付き回答が返ることを確認 ← **✅ スコープA 完了条件達成**
-  - 質問: "採卵鶏の衛生管理で重要なポイントを教えて"
-  - 引用元: `鶏卵生産衛生管理ハンドブック.pdf` page 4 / 9
+  - 質問1: "採卵鶏の衛生管理で重要なポイントを教えて" → ハンドブック p4/p9 引用
+  - 質問2: "鳥インフルエンザの感染拡大防止のために最低限すべきことを教えて" → HPAI防疫指針本体/資料2 p25 引用
   - モデル: `jp.anthropic.claude-haiku-4-5-20251001-v1:0` (Inference Profile)
 
 ## Step 4: 会話バックエンド（スコープB / Phase 1.5）
