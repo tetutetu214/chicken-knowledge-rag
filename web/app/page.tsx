@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { generateClient } from 'aws-amplify/data';
+import type { Schema } from '../../amplify/data/resource';
+
+const client = generateClient<Schema>();
 
 interface Citation {
     uri: string;
@@ -12,10 +16,9 @@ interface QAPair {
     question: string;
     answer: string;
     citations: Citation[];
+    hasKbResults: boolean;
     error?: boolean;
 }
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Home() {
     const { user, signOut } = useAuthenticator((context) => [context.user]);
@@ -26,40 +29,35 @@ export default function Home() {
     const handleSubmit = async () => {
         const trimmed = question.trim();
         if (!trimmed || loading) return;
-        if (!apiUrl) {
-            setHistory((prev) => [
-                ...prev,
-                {
-                    question: trimmed,
-                    answer:
-                        'NEXT_PUBLIC_API_URL が未設定です。'
-                        + ' web/.env.local を作成して Lambda Function URL を指定してください。',
-                    citations: [],
-                    error: true,
-                },
-            ]);
-            return;
-        }
 
         setLoading(true);
         setQuestion('');
 
         try {
-            const res = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: trimmed }),
+            const { data, errors } = await client.queries.chat({
+                question: trimmed,
             });
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.message || data.error || `HTTP ${res.status}`);
+            if (errors && errors.length > 0) {
+                throw new Error(errors[0].message ?? 'Unknown GraphQL error');
             }
+            if (!data) {
+                throw new Error('No data returned');
+            }
+
+            const citations: Citation[] = (data.citations ?? [])
+                .filter((c): c is NonNullable<typeof c> => c !== null)
+                .map((c) => ({
+                    uri: c.uri ?? '',
+                    page: c.page ?? null,
+                }));
+
             setHistory((prev) => [
                 ...prev,
                 {
                     question: trimmed,
                     answer: data.answer ?? '',
-                    citations: data.citations ?? [],
+                    citations,
+                    hasKbResults: data.hasKbResults ?? false,
                 },
             ]);
         } catch (err) {
@@ -70,6 +68,7 @@ export default function Home() {
                     question: trimmed,
                     answer: `Error: ${message}`,
                     citations: [],
+                    hasKbResults: false,
                     error: true,
                 },
             ]);
@@ -94,7 +93,7 @@ export default function Home() {
                             🐓 Chicken Knowledge RAG
                         </h1>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                            ペット鶏100羽以上との暮らしを支援するRAGエージェント (PoC・1スレッド限定)
+                            ペット鶏100羽以上との暮らしを支援するRAGエージェント (1スレッド限定、認証付き)
                         </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-zinc-600 dark:text-zinc-400">
@@ -111,7 +110,7 @@ export default function Home() {
                 <div className="space-y-4 mb-6">
                     {history.length === 0 && !loading && (
                         <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-5 text-zinc-500 dark:text-zinc-400 text-sm">
-                            養鶏に関する質問を下のフォームに入力してください。<br />
+                            鶏に関する質問を下のフォームに入力してください。<br />
                             例: 「鳥インフルエンザの感染拡大防止のために最低限すべきことは？」
                         </div>
                     )}
@@ -135,10 +134,16 @@ export default function Home() {
                                     className={`font-semibold shrink-0 ${
                                         qa.error
                                             ? 'text-red-700 dark:text-red-400'
-                                            : 'text-green-700 dark:text-green-400'
+                                            : qa.hasKbResults
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : 'text-amber-700 dark:text-amber-400'
                                     }`}
                                 >
-                                    回答:
+                                    {qa.error
+                                        ? 'エラー:'
+                                        : qa.hasKbResults
+                                            ? '回答 (KB根拠あり):'
+                                            : '回答 (KB根拠なし):'}
                                 </div>
                                 <div className="flex-1 whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
                                     {qa.answer}
@@ -167,7 +172,7 @@ export default function Home() {
 
                     {loading && (
                         <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-5 text-zinc-500 dark:text-zinc-400 text-sm animate-pulse">
-                            🔍 KB検索 + Claude 4.5 が回答を生成中...
+                            🔍 KB検索 + Claude が回答を生成中...
                         </div>
                     )}
                 </div>
@@ -177,7 +182,7 @@ export default function Home() {
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="養鶏に関する質問を入力 (Cmd/Ctrl+Enter で送信)"
+                        placeholder="鶏に関する質問を入力 (Cmd/Ctrl+Enter で送信)"
                         className="w-full border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 rounded p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                         rows={3}
                         disabled={loading}
