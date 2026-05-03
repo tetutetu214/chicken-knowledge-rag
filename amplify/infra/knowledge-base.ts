@@ -53,12 +53,21 @@ export const createKnowledgeBase = (
     });
 
     // S3 Vectors Index (1024d / cosine / float32)
-    const vectorIndex = new s3vectors.CfnIndex(scope, 'VectorIndex', {
+    // 論理ID 'VectorIndexV2' / indexName 'chicken-rag-index-v2' は metadataConfiguration 追加に伴う作り直し用。
+    // S3 Vectors の filterable メタデータ上限 (2048バイト) に Bedrock KB のチャンクテキストが
+    // 引っかかるため、AMAZON_BEDROCK_TEXT / AMAZON_BEDROCK_METADATA を非フィルタ化する。
+    const vectorIndex = new s3vectors.CfnIndex(scope, 'VectorIndexV2', {
         vectorBucketArn: vectorBucket.attrVectorBucketArn,
-        indexName: 'chicken-rag-index',
+        indexName: 'chicken-rag-index-v2',
         dataType: 'float32',
         dimension: 1024,
         distanceMetric: 'cosine',
+        metadataConfiguration: {
+            nonFilterableMetadataKeys: [
+                'AMAZON_BEDROCK_TEXT',
+                'AMAZON_BEDROCK_METADATA',
+            ],
+        },
     });
     vectorIndex.addDependency(vectorBucket);
 
@@ -97,8 +106,10 @@ export const createKnowledgeBase = (
     });
 
     // Bedrock Knowledge Base 本体 (S3 Vectors バックエンド)
+    // -v2 サフィックス: VectorIndex 再作成に伴う KB Replacement 時、
+    // 同名の旧KBがまだ存在している間に新KB作成しようとして衝突するのを回避する。
     const knowledgeBase = new bedrock.CfnKnowledgeBase(scope, 'KnowledgeBase', {
-        name: 'chicken-knowledge-rag-kb',
+        name: 'chicken-knowledge-rag-kb-v2',
         roleArn: kbServiceRole.roleArn,
         knowledgeBaseConfiguration: {
             type: 'VECTOR',
@@ -122,7 +133,7 @@ export const createKnowledgeBase = (
     // チャンキング設定は spec.md §3-3 準拠 (parent 1500 / child 300 / overlap 60)
     const dataSource = new bedrock.CfnDataSource(scope, 'DataSource', {
         knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-        name: 'chicken-rag-docs-datasource',
+        name: 'chicken-rag-docs-datasource-v2',
         dataSourceConfiguration: {
             type: 'S3',
             s3Configuration: {
