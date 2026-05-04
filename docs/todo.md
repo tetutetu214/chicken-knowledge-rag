@@ -217,6 +217,7 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [ ] `POST /knowledge` API 実装（Lambda）
 - [ ] Lambda → S3 knowledge-bucket 保存
 - [ ] EventBridge → StartIngestionJob 自動実行確認
+- [ ] ナレッジ品質ガード設計の反映 — Issue #15 (構造化強制 / source_type / カテゴリ別取込ガード)
 
 ## Step 7: 精度チューニング（運用フェーズ）
 
