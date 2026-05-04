@@ -280,6 +280,57 @@
 - **副作用**: フロント側で `hasKbResults` boolean を見て UI 色を緑/アンバーに分けることで、テキスト冒頭の ⚠ と組み合わせて2重に明示している。
 - **systemPrompt 抜粋**: 「疾病・薬剤・緊急対応・害獣捕獲・卵食品安全に関する内容を含む場合は『専門家に相談してください』を末尾に必ず添えること」。Phase 1.5 後半の Bedrock Guardrails 設定 (Step 7) と組み合わせて二重防御を予定。
 
+### 2026-05-04: B-3 後半 マルチスレッドUI のデータモデルは自前 `a.model('Conversation','Message')` を採用
+
+- **決定**: B-3 前半で見送った `a.conversation()` (AI Kit) は B-3 後半でも採用しない。代わりに `a.model('Conversation', 'Message')` で自前モデルを定義し、フロントが Conversation/Message の CRUD を `client.models.X` で直接行う構成に決定。
+- **理由**:
+  1. B-3 前半で AI Kit の `defineConversationHandlerFunction` を見送った理由 (公式ドキュメント薄、KB必須化のカスタムハンドラ複雑) が B-3 後半でも変わらない
+  2. `allow.owner()` でフロントから直接 CRUD する方が authz が単純 (Cognito sub ベースの所有者ガードが自動で効く)
+  3. chat Lambda は KB検索+回答生成だけに専念でき、メッセージ保存責務はフロントに分離。トランザクション性は犠牲になるが構造が明快
+- **代案として検討した選択肢**:
+  - 案2: AI Kit Custom Handler 再挑戦 → 不採用 (理由1)
+  - 案3: Lambda 内で Conversation/Message を生成・保存 → 不採用 (Lambda が AppSync を呼ぶ追加 IAM 必要、複雑化)
+
+### 2026-05-04: 長期スレッドの履歴は「summary + 直近10件」方式で圧縮
+
+- **決定**: ChatGPT/Claude.ai と同様の累積要約方式を採用。Conversation に `summary: string` と `summarizedCount: int` を追加し、メッセージが増えるたびにフロントが「summary 化されていない件数 > 10」を判定して `summarize` mutation を非同期で呼ぶ。
+- **動作**:
+  - 履歴 ≤ 10 件: summary なし、生履歴を Converse の messages にそのまま積む
+  - 履歴 11 件目以降: chat 呼び出しに summary + 直近10件を渡す。回答後、フロントが `[summarizedCount, total-10)` 区間を summarize mutation に渡し、Conversation を update
+  - summarize mutation は `existingSummary + 新メッセージ群` を Haiku 4.5 で統合し新 summary を返す → スレッドが伸びても要約 mutation の入力は常に約10件分で一定
+- **理由**: 「ゼロから会話を始まらせない」というUX要件と、「Haiku 4.5 のコンテキスト窓を浪費しない」というコスト要件の両立。Lambda への入力サイズもほぼ一定に保てる。
+- **コスト試算**: 要約1回あたり Haiku 4.5 で約 $0.0001 前後。10ターンに1回なのでほぼ無視できる。
+- **タイトル自動生成**: 最初のユーザー質問の先頭40文字を `Conversation.title` に自動設定。LLM要約は不要 (コスト無駄)。
+- **削除UX**: Amplify Data はリレーションの cascading delete をサポートしないため、フロント側で「Message 一覧取得 → 個別削除 → Conversation 削除」のループを実装。
+
+### 2026-05-04: DynamoDB TTL は CDK escape hatch (`cfnTable.timeToLiveAttribute`) で90日設定
+
+- **決定**: Amplify Gen2 の `a.model()` には TTL を宣言する公式構文がないため、`backend.data.resources.cfnResources.amplifyDynamoDbTables[modelName].timeToLiveAttribute = { attributeName: 'expiresAt', enabled: true }` で後付け設定する。
+- **動作確認**: 両テーブル (Conversation / Message) で `aws dynamodb describe-time-to-live` の結果が `TimeToLiveStatus: ENABLED, AttributeName: expiresAt` となっていることを確認。
+- **モデル側**: `a.integer()` で `expiresAt` 属性を宣言、フロント側でレコード作成時に `Math.floor(Date.now() / 1000) + 90 * 86400` を渡す。
+- **注意**: `cfnTable.timeToLiveAttribute` の代入は Amplify Gen2 の `AmplifyDynamoDBTable` カスタムリソース固有のプロパティ。標準 `AWS::DynamoDB::Table` の `TimeToLiveSpecification` とは別系統なので混同注意。
+
+### 2026-05-04: `RetrieveAndGenerate` を捨てて `Retrieve` + `Converse` 自前構成に統一 (履歴対応のため)
+
+- **決定**: B-3 前半は KB ヒットありの場合に `RetrieveAndGenerateCommand` を使っていたが、この API は履歴 (messages 配列) を受け付けない。B-3 後半でマルチスレッド + 履歴対応するため、KB ヒットあり/なし両方を `Retrieve` + 自前 `Converse` 構成に統一した。
+- **影響**:
+  - citations は `RetrieveAndGenerate` の `CitedReferences` から「LLM が実際に引用したもの」が返っていたが、自前構成では Retrieve 結果 top5 を全件 citations として返す形に簡略化 (重複ファイル+ページはマージ)
+  - system prompt に Retrieve 結果の抜粋を `【出典: ファイル名 pN】本文...` 形式で埋め込み、回答内で出典を明示するよう指示
+- **トレードオフ**: 「実際に引用された範囲」と「retrievaeで上位に来た範囲」がズレる可能性あり。Phase 1.5 後半の精度チューニング (Step 7) でリランカー or プロンプトテンプレート化で再調整する。
+
+### 2026-05-04: ハマりどころ — AWSJSON 入力フィールドは JSON 文字列で渡す
+
+- **症状**: Message テーブルに assistant メッセージが1件も保存されない (user メッセージのみ存在)。フロント側ではエラーキャプチャしておらず、画面にもコンソールにも出ていなかった。
+- **原因**: `a.json()` フィールド (`citations`) に JavaScript の object 配列をそのまま渡していた。AppSync の `AWSJSON` スカラは入出力共に JSON 文字列を期待するため、object をそのまま渡すと「型不一致で create が失敗」する。
+- **修正**: 保存時は `JSON.stringify(citationsArray)` で文字列化、取得時は両対応のパース関数 (`parseCitations`) で string/object どちらでも処理できるようにする。
+- **教訓**: Amplify Data の create/update 戻り値は `{data, errors}` の構造で、エラーは throw されず errors 配列に入る。**全ての mutation 呼び出しで errors を必ずキャプチャして throw する**ようにすべき。エラーが画面に出ないと原因特定が遅れる。
+
+### 2026-05-04: ハマりどころ — `ampx sandbox` の synth は実行開始時のスキーマで固定
+
+- **症状**: `ampx sandbox --once` 実行中に data/resource.ts に `summarizedCount` フィールドを追加したが、デプロイ完了後も AppSync スキーマの `CreateConversationInput` にこのフィールドが含まれず、フロントから create するとエラー (`The variables input contains a field that is not defined`)。
+- **原因**: `ampx sandbox` の `Synthesizing backend...` フェーズは実行開始直後に走り、その時点のソースコードでスキーマを固定する。走行中の編集は次回 synth まで反映されない。
+- **教訓**: スキーマ変更を伴う編集は **必ず ampx sandbox の synth が完了する前に終わらせる**、または編集してから再デプロイする。差分デプロイは数十秒で済むので追加コストは小さい。
+
 ---
 
 ## 参考情報のメモ
