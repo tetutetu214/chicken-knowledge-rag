@@ -331,6 +331,71 @@
 - **原因**: `ampx sandbox` の `Synthesizing backend...` フェーズは実行開始直後に走り、その時点のソースコードでスキーマを固定する。走行中の編集は次回 synth まで反映されない。
 - **教訓**: スキーマ変更を伴う編集は **必ず ampx sandbox の synth が完了する前に終わらせる**、または編集してから再デプロイする。差分デプロイは数十秒で済むので追加コストは小さい。
 
+### 2026-05-04: 決定事項 — Amplify Hosting も CDK で IaC 化（手作業マネコン排除）
+
+- **決定**: Amplify Hosting も `aws-cdk-lib/aws-amplify-alpha` で IaC 化し、`amplify/infra/hosting.ts` に配置する。AWS Console 手作業 (Host web app ウィザード) は採用しない。
+- **理由**: 当初 Console 手作業を提案したが、てつてつから「再現性がない、なぜマネコンに行かせるのか」とフィードバック。プロジェクトのバックエンド (KB / IAM / Budget 等) はすでに CDK 化されているため、Hosting だけ Console 手作業だと整合性が取れない。docs に書いても次回再現できない問題もある。
+- **採用構成**:
+  - `Amplify::App`: GitHub 連携、`SecretValue.secretsManager('chicken-rag/github-token')` で PAT を遅延参照
+  - `Amplify::Branch`: `autoBuild: true` で push 自動デプロイ、ブランチ名は環境変数 `HOSTING_BRANCH_NAME` で切替可能
+  - `platform: amplify.Platform.WEB`: 静的サイト配信（SSR Compute 課金を発生させない）
+  - 環境変数: `AMPLIFY_MONOREPO_APP_ROOT=web`、`AMPLIFY_OUTPUTS_GZ_B64=<gzip+base64>`
+- **トレードオフ**: `@aws-cdk/aws-amplify-alpha@2.252.0-alpha.0` は alpha 版で API 変更リスクあり。aws-cdk-lib のバージョンと厳密に揃える必要あり (今回は 2.252.0 で揃える)。
+- **GitHub PAT scopes**: `repo` + `admin:repo_hook` (Webhook 自動セット用)
+- **Secrets Manager 名**: `chicken-rag/github-token` (CDK でハードコード)
+
+### 2026-05-04: 決定事項 — Sandbox を本番として共有運用（KB 二重作成回避）
+
+- **決定**: Amplify Gen2 公式推奨の「Sandbox 開発 / pipeline-deploy 本番」分離は採用せず、**Sandbox 環境を本番として共有運用**する。
+- **理由**: 公式パターンだと Bedrock KB と S3 Vectors が二重作成され、14本の文書を再 ingestion する手間と KB ID 同期の問題が発生する。家族のみのシステムには過剰。
+- **影響**:
+  - `npx ampx sandbox delete` を実行すると Amplify Hosting も停止する → docs/todo.md の既知制約に「**削除禁止**」を明記
+  - Hosting からは Sandbox の Cognito/AppSync/Lambda を参照する `amplify_outputs.json` を経由する
+- **将来の本番化 (Phase 2 以降)**: KB を別 Stack に分離 → `Bucket.fromBucketName` 参照に変更し、main ブランチで pipeline-deploy する設計を検討
+
+### 2026-05-04: 決定事項 — Next.js は output: 'export' で完全静的サイト化
+
+- **決定**: `web/next.config.ts` に `output: 'export'` を設定して、`out/` に静的ファイル群を書き出す。Amplify Hosting の `platform: WEB` (静的配信) と組み合わせる。
+- **理由**: 全ページが Client Component (Authenticator + AppSync 直接呼び出し) で SSR 機能を使っていないため、`platform: WEB_COMPUTE` (SSR) は不要。Compute 課金 (Lambda 起動時間あたり) を完全に避けられる。
+- **コスト試算**: ビルド時間 $0.5/月 (10回ビルド想定) + データ転送 $0.05/月 + ストレージ $0.001/月 = **月 $1 未満**
+- **トレードオフ**: 動的ルート / Server Actions / Route Handlers などは使えなくなる (現状不要なので影響なし)
+
+### 2026-05-04: 決定事項 — amplify_outputs.json は web/ 配下に置く
+
+- **決定**: `npx ampx sandbox --outputs-out-dir web` で `amplify_outputs.json` を web/ 配下に出力する。
+- **理由**: Next.js 16 Turbopack は `turbopack.root` で workspace root を web/ に固定すると、外部ファイル (`'../../amplify_outputs.json'` = リポジトリルート) が import で解決できない。出力先を web/ にすれば `'../amplify_outputs.json'` (web/app/ → web/) で解決可能。
+- **影響**:
+  - `web/app/ConfigureAmplifyClientSide.tsx` の import パスを `'../amplify_outputs.json'` に変更
+  - `amplify.yml` の preBuild も `gunzip > amplify_outputs.json` (web/ 内に出力) に変更
+  - リポジトリルートの古い `amplify_outputs.json` は削除（混乱回避）
+- **運用**: 今後 `ampx sandbox` 実行時は **必ず `--outputs-out-dir web`** を付ける（todo.md の主要コマンドにも記載）
+
+### 2026-05-04: ハマりどころ — Amplify Hosting 環境変数は 1 個あたり 5500 文字上限
+
+- **症状**: CDK で `environmentVariables: { AMPLIFY_OUTPUTS_B64: <15360文字> }` を渡すと CFn validation で `[#/EnvironmentVariables/1/Value: expected maxLength: 5500, actual: 15360]` エラー。Stack デプロイが UPDATE_ROLLBACK_COMPLETE で失敗。
+- **原因**: AWS Amplify Hosting の API 制約で、環境変数は 1 個あたり 5500 文字上限 (key + value 合計ではなく value 単体)
+- **対処**: `gzip -c amplify_outputs.json | base64 -w0` で圧縮 (15360 → **2316 文字**) し、`AMPLIFY_OUTPUTS_GZ_B64` 環境変数として渡す。preBuild で `echo "$AMPLIFY_OUTPUTS_GZ_B64" | base64 -d | gunzip > amplify_outputs.json` で復元。
+- **教訓**: AWS のサービス制約は CFn validation で初めて発覚することがある。設計時に AWS Service Quotas や `cfn-lint` でスポットチェックすると事前に気付ける。
+
+### 2026-05-04: ハマりどころ — Next.js 16 build 時の TypeScript チェックが workspace root を超えて拡散
+
+- **症状**: Amplify Hosting で `cd web && npm run build` 実行時、Next.js が tsc を起動して `../amplify/data/resource.ts` まで型チェック → `@aws-amplify/backend` が `web/node_modules` に存在せず `Cannot find module` で落ちる。
+- **原因推測**: Next.js が複数 lockfile (リポジトリルート + web/) を検出して workspace root をリポジトリルートと判定 → tsc の cwd / include 解釈もリポジトリルート起点に。
+- **試した対処** (時系列):
+  1. `turbopack.root: resolve(__dirname)` で workspace root を web/ に固定 → Turbopack の compile は通るが tsc は不変
+  2. `amplify_outputs.json` を web/ 配下に移動して import を `'../amplify_outputs.json'` に変更 → import エラーは消えたが TypeScript チェック失敗は継続
+  3. **`typescript.ignoreBuildErrors: true`** で next build の型チェック自体を無効化 → 成功
+- **採用根拠**: 型チェックは `ampx sandbox` の `Running type checks...` フェーズが backend 全体 (amplify/ 含む) を見るため、Amplify Hosting 側で重ねて走らせる必要なし。フロント側の型チェックは別途 `cd web && npx tsc --noEmit` で担保可能。
+- **教訓**: Next.js 16 + Turbopack は従来の Next.js と挙動が違う部分がある (`web/AGENTS.md` の警告どおり)。複数の対処を試した順序を時系列で残すと再発時に最短ルートが分かる。
+
+### 2026-05-04: ハマりどころ — Amplify::Branch 作成直後の初回ビルドは autoBuild でも自動キックされない
+
+- **症状**: CDK で `app.addBranch(name, { autoBuild: true })` で作成しても、CFn 完了直後に初回ビルドが起動しない (`aws amplify list-jobs` が空)。
+- **仕様**: `autoBuild` は「以降の git push を契機に自動ビルド」する設定。初回ビルドは webhook を発火する push イベントが必要。
+- **対処**: `aws amplify start-job --app-id <id> --branch-name <name> --job-type RELEASE --region ap-northeast-1` で手動キック (今回はこのコマンドで初回 jobId 1 を起動)。
+- **代案**: ブランチ作成後に空コミット push する (`git commit --allow-empty && git push`) → webhook 経由で自動ビルド。
+- **教訓**: CDK 化されているからといって完全自動とは限らない。CDK が作るのはリソース定義で、初回起動はその後の運用フロー側に委ねられる。
+
 ---
 
 ## 参考情報のメモ
