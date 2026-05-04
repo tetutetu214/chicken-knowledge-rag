@@ -365,10 +365,10 @@ export default function Home() {
             <aside className="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-screen sticky top-0">
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
                     <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                        🐓 Chicken RAG
+                        🐓 Cocco RAG
                     </h1>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        ペット鶏 飼育アシスタント
+                        にわとり飼育アシスタント　コケ先輩
                     </p>
                 </div>
                 <button
