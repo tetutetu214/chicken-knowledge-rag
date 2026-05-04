@@ -4,15 +4,15 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-04 (Phase 1.5 B-3 前半 完了。**PR #9 マージ済み**、main は merge commit `ec0b76c` で最新化、ブランチ整理済み)
+最終更新: 2026-05-04 (Phase 1.5 **B-3 後半 完了**。マルチスレッドUI + 要約方式 + DynamoDB TTL90日 まで実装、ブラウザ動作確認済み。PR 作成準備中、ブランチ `feature/multi-thread-ui`)
 
 ### 次回セッション開始時にやること
 
-1. **次の着手対象を選ぶ** (どれから着手するかは てつてつ判断):
-   - (a) **B-3 後半**: マルチスレッドUI 実装 ← 当初要件、新ブランチ `feature/multi-thread-ui`
-   - (b) **B-4**: ナレッジ投稿フォーム ← `feature/knowledge-form`
-   - (c) **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL) ← 認証強化済みなので可能
-2. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
+1. **PR をマージ**: B-3 後半 PR をマージ → main 最新化 → `feature/multi-thread-ui` ブランチ削除
+2. **次の着手対象を選ぶ** (b → c の順を想定):
+   - (b) **B-4**: ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
+   - (c) **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL) ← B-3 完了で公開可能になった
+3. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
 
 ### 現在の構成スナップショット
 
@@ -21,25 +21,22 @@
 - **配備リソース**:
   - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
   - DataSource ID: AFSV7SCBAD
-  - **AppSync GraphQL**: `amplify_outputs.json` の `data.url`（Cognito User Pool 認証必須、`chat(question)` クエリで Bedrock 呼び出し）
-  - **chat Lambda**: `amplify_outputs.json` の `custom.chatFunctionName` (TypeScript、Bedrock Retrieve → 類似度 ≥ 0.7 で RetrieveAndGenerate / 未満で Converse 分岐)
+  - **AppSync GraphQL**: `amplify_outputs.json` の `data.url`（Cognito User Pool 認証必須）
+    - `chat(question, historyJson, summary)` クエリ: Bedrock Retrieve + Converse、KB必須化、履歴・要約対応
+    - `summarize(existingSummary, messagesJson)` mutation: Haiku 4.5 で会話履歴を統合要約
+    - `Conversation` モデル: title / summary / summarizedCount / expiresAt + messages (hasMany)、`allow.owner()` で所有者ガード
+    - `Message` モデル: conversationId / role / content / citations(JSON) / hasKbResults / expiresAt、`allow.owner()`
+  - **DynamoDB TTL**: Conversation / Message 両方に `expiresAt` 属性 (90日後の Unix epoch seconds) で TTL 有効化
+  - **chat Lambda**: `amplify_outputs.json` の `custom.chatFunctionName` (TypeScript、Retrieve + Converse 統一構成)
+  - **summarize Lambda**: `amplify_outputs.json` の `custom.summarizeFunctionName` (Haiku 4.5 で要約)
   - **Cognito User Pool**: `amplify_outputs.json` の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
-  - フロント: `web/` (Next.js 16 + Authenticator + AppSync 経由 `client.queries.chat()` 呼び出し)
+  - フロント: `web/` (Next.js 16 + Authenticator + サイドバーマルチスレッドUI + 要約自動呼出)
 
 ### 主要コマンド
 
 - ローカル起動: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
 - 再デプロイ: `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
 - 全削除: `npx ampx sandbox delete` または CFn console で Stack 削除
-
-### B-3 後半 (マルチスレッドUI) の検討メモ
-
-着手時に以下を最初に決める必要あり:
-
-1. **データモデル方針**: `a.model('Conversation', 'Message')` で自前定義 vs `a.conversation()` の再検討 (defineConversationHandlerFunction の実装難度を改めて評価)
-2. **DynamoDB スキーマ**: PK=`USER#{userId}` / SK=`CONV#{ulid}` または `MSG#{convId}#{ulid}`、TTL 90日
-3. **UI**: スレッド一覧サイドバー + チャット領域、Conversation の create/list/delete の API
-4. **既存 1問1答の互換**: B-3 前半のシンプル UI から段階移行するか、丸ごと差し替えるか
 
 ### 既知の制約 (重要)
 
@@ -48,7 +45,9 @@
 - MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可
 - Next.js 16 起動時の lockfile 警告は機能影響なし (`web/next.config.ts` で `turbopack.root` 設定で消せるが未対応)
 - **S3 Vectors は閾値なしで top-K を必ず返す** → Lambda 側でコサイン類似度 0.7 を閾値に振り分け (knowledge.md 2026-05-04 参照)
-- AI Kit の `defineConversationHandlerFunction` は公式ドキュメントが薄く、event 型・履歴取得が複雑 (B-3 前半で a.query 採用の理由)
+- AI Kit の `defineConversationHandlerFunction` は公式ドキュメントが薄く、B-3 後半でも採用見送り。代わりに `a.model()` + フロント直接 CRUD (knowledge.md 2026-05-04 参照)
+- **AppSync の `AWSJSON` (= `a.json()` フィールド) は入出力共に JSON 文字列**。object をそのまま渡すと create が静かに失敗する。必ず `JSON.stringify` で渡し、Amplify Data の create/update 戻り値の `errors` は必ずキャプチャすること
+- **`ampx sandbox` の synth は実行開始時のソースで固定**。走行中の編集は次回 synth まで反映されない。スキーマ変更を伴う編集は実行開始前に終わらせるか、再デプロイで反映する
 
 ## 凡例
 
@@ -161,7 +160,9 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] Amplify Gen2 プロジェクト初期化（`npm create amplify`）（Step 0.5 で完了済み）
 - [x] `amplify/data/resource.ts` に `a.query('chat')` ルート定義（Phase 1.5 B-3 前半、2026-05-04。当初 `a.conversation()` 予定だったが案Yに変更、knowledge.md 参照）
 - [x] Conversation Handler を AppSync 経由に切替（Phase 1.5 B-3 前半、2026-05-04。TypeScript Lambda + Direct Lambda Resolver）
-- [ ] DynamoDB スキーマ確認（PK/SK・TTL・ULID採用）（Phase 1.5 B-3 後半、マルチスレッド対応時）
+- [x] DynamoDB スキーマ確認（Conversation/Message を `a.model()` で自前定義、TTL 90日を CDK escape hatch で設定、id は Amplify 標準採番）（Phase 1.5 B-3 後半、2026-05-04）
+- [x] summarize-handler Lambda 新規作成（Haiku 4.5 で履歴を統合要約）（Phase 1.5 B-3 後半、2026-05-04）
+- [x] chat-handler を Retrieve + Converse 自前構成に統一（履歴 + summary 対応、citations は Retrieve top5 から重複除去で構築）（Phase 1.5 B-3 後半、2026-05-04）
 - [ ] EventBridge ルール作成（S3 ObjectCreated → StartIngestionJob）（Phase 1.5 B-4）
 
 ## Step 5: フロントエンド（スコープC / Phase 1.5）
@@ -179,9 +180,10 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] Playwright smoke test を認証ガード前提に書き換え（既存3本は skip、新規「サインイン画面表示」1本追加 → 1 passed / 3 skipped）
 - [x] Lambda Function URL の認証強化（AppSync 経由 + Cognito User Pool）（Phase 1.5 B-3 前半、2026-05-04 完了。`generateClient<Schema>().queries.chat()` 経由で全リクエストが認証必須に）
 - [x] KBヒット有無による回答振り分け実装（cosine 類似度 >= 0.7 を閾値、未満は「⚠ 参考資料にはありません」+ LLM 一般知識回答、2026-05-04）
-- [ ] マルチスレッドチャットUI（Phase 1.5 B-3 後半、`a.model('Conversation', 'Message')` または `a.conversation()` 再検討）
-- [ ] スレッド一覧サイドバー実装（Phase 1.5 B-3 後半）
-- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL、認証強化は前半完了済み）
+- [x] マルチスレッドチャットUI（`a.model('Conversation', 'Message')` + `allow.owner()` 採用、フロントが直接 CRUD、累積要約方式で履歴圧縮）（Phase 1.5 B-3 後半、2026-05-04）
+- [x] スレッド一覧サイドバー実装（左サイドバー固定280px、選択ハイライト、hover で削除ボタン表示）（Phase 1.5 B-3 後半、2026-05-04）
+- [x] 累積要約による長期履歴圧縮（summarizedCount で進捗管理、新10件分追加要約、コスト約 $0.0001/回）（Phase 1.5 B-3 後半、2026-05-04）
+- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL、B-3 完了で公開可能）
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
 
