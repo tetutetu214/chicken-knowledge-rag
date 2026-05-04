@@ -4,20 +4,20 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-04 (Phase 1.5 **B-3 後半 完了**。マルチスレッドUI + 要約方式 + DynamoDB TTL90日 まで実装、ブラウザ動作確認済み。PR 作成準備中、ブランチ `feature/multi-thread-ui`)
+最終更新: 2026-05-04 (Phase 1.5 **B-5 完了**。Amplify Hosting CDK 化 + 静的エクスポート + 本番URL動作確認まで完了、ブランチ `feature/amplify-hosting`)
 
 ### 次回セッション開始時にやること
 
-1. **PR をマージ**: B-3 後半 PR をマージ → main 最新化 → `feature/multi-thread-ui` ブランチ削除
-2. **次の着手対象を選ぶ** (b → c の順を想定):
-   - (b) **B-4**: ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
-   - (c) **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL) ← B-3 完了で公開可能になった
+1. **PR をマージ**: B-5 PR をマージ → main 最新化 → `feature/amplify-hosting` ブランチ削除
+2. **次の着手対象**: B-4 ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
 3. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
+4. **sandbox 実行時の注意**: 必ず `npx ampx sandbox --outputs-out-dir web` で実行する（amplify_outputs.json を web/ 配下に出力する設計）
 
 ### 現在の構成スナップショット
 
 - **AWSアカウント**: `~/.secrets/chicken-knowledge-rag.env` 参照、リージョン ap-northeast-1
 - **デプロイ済み Stack**: `amplify-chickenknowledgerag-tetutetu-sandbox-8023efca66`
+- **本番URL**: `~/.secrets/chicken-knowledge-rag.env` の `AMPLIFY_HOSTING_URL` 参照（feature/amplify-hosting ブランチ → 動作確認完了、main マージ後は main URL に切替）
 - **配備リソース**:
   - Bedrock KB ID: 19S0LSZVPF (14本取込済み: 公的マニュアル7本 + 鳥獣・卵食品安全7本)
   - DataSource ID: AFSV7SCBAD
@@ -30,24 +30,30 @@
   - **chat Lambda**: `amplify_outputs.json` の `custom.chatFunctionName` (TypeScript、Retrieve + Converse 統一構成)
   - **summarize Lambda**: `amplify_outputs.json` の `custom.summarizeFunctionName` (Haiku 4.5 で要約)
   - **Cognito User Pool**: `amplify_outputs.json` の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
-  - フロント: `web/` (Next.js 16 + Authenticator + サイドバーマルチスレッドUI + 要約自動呼出)
+  - **Amplify Hosting App**: `amplify_outputs.json` の `custom.amplifyHostingAppId` / `amplifyHostingDefaultDomain`（CDK で IaC 化、GitHub PAT は Secrets Manager の `chicken-rag/github-token` を参照）
+  - フロント: `web/` (Next.js 16 + Authenticator + サイドバーマルチスレッドUI + 要約自動呼出、`output: 'export'` で静的サイト化)
 
 ### 主要コマンド
 
 - ローカル起動: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
-- 再デプロイ: `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once`
-- 全削除: `npx ampx sandbox delete` または CFn console で Stack 削除
+- 再デプロイ: `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once --outputs-out-dir web`
+- ローカル静的ビルド検証: `cd web && rm -rf .next out && npm run build && npx serve out -p 3000`
+- 全削除: `npx ampx sandbox delete` または CFn console で Stack 削除（**注意: Sandbox を本番として運用しているため削除禁止**）
 
 ### 既知の制約 (重要)
 
 - IAM description は ASCII + Latin-1 のみ
 - env ファイルは `export` 必須 (子プロセス用)
 - MAFFサイトの `attach/pdf/` 配下は Bot ブロックで自動取得不可
-- Next.js 16 起動時の lockfile 警告は機能影響なし (`web/next.config.ts` で `turbopack.root` 設定で消せるが未対応)
+- **Next.js 16 multiple lockfile 警告は機能影響なし**だが Amplify Hosting ビルド時に workspace root が誤判定されるため `web/next.config.ts` の `turbopack.root` で web/ に固定済み
 - **S3 Vectors は閾値なしで top-K を必ず返す** → Lambda 側でコサイン類似度 0.7 を閾値に振り分け (knowledge.md 2026-05-04 参照)
 - AI Kit の `defineConversationHandlerFunction` は公式ドキュメントが薄く、B-3 後半でも採用見送り。代わりに `a.model()` + フロント直接 CRUD (knowledge.md 2026-05-04 参照)
 - **AppSync の `AWSJSON` (= `a.json()` フィールド) は入出力共に JSON 文字列**。object をそのまま渡すと create が静かに失敗する。必ず `JSON.stringify` で渡し、Amplify Data の create/update 戻り値の `errors` は必ずキャプチャすること
 - **`ampx sandbox` の synth は実行開始時のソースで固定**。走行中の編集は次回 synth まで反映されない。スキーマ変更を伴う編集は実行開始前に終わらせるか、再デプロイで反映する
+- **Amplify Hosting 環境変数は 1 個 5500 文字上限** → `amplify_outputs.json` を gzip+base64 で渡す必要あり (`AMPLIFY_OUTPUTS_GZ_B64`)
+- **Amplify Hosting + monorepo (web/) の場合、`amplify_outputs.json` は web/ 配下に置く必要あり** (Turbopack workspace root + import 解決の制約)
+- **Sandbox を本番として共有運用**しているため `npx ampx sandbox delete` は禁止 (削除すると Hosting も止まる)
+- **`next build` の TypeScript チェックは無効化**済み (`typescript.ignoreBuildErrors: true`)。型チェックは `ampx sandbox` の "Running type checks..." で代替
 
 ## 凡例
 
@@ -183,7 +189,13 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] マルチスレッドチャットUI（`a.model('Conversation', 'Message')` + `allow.owner()` 採用、フロントが直接 CRUD、累積要約方式で履歴圧縮）（Phase 1.5 B-3 後半、2026-05-04）
 - [x] スレッド一覧サイドバー実装（左サイドバー固定280px、選択ハイライト、hover で削除ボタン表示）（Phase 1.5 B-3 後半、2026-05-04）
 - [x] 累積要約による長期履歴圧縮（summarizedCount で進捗管理、新10件分追加要約、コスト約 $0.0001/回）（Phase 1.5 B-3 後半、2026-05-04）
-- [ ] Amplify Hosting にデプロイ（Phase 1.5 B-5、奥さんへの公開URL、B-3 完了で公開可能）
+- [x] Amplify Hosting にデプロイ（Phase 1.5 B-5、2026-05-04 完了）
+  - Next.js 16 で `output: 'export'` を採用し静的サイト化（SSR Compute 課金回避）
+  - `amplify/infra/hosting.ts` で Amplify::App + Amplify::Branch を CDK 化（手作業マネコン排除、再現性確保）
+  - GitHub PAT は AWS Secrets Manager (`chicken-rag/github-token`) から CDK が `SecretValue.secretsManager()` で参照
+  - `amplify_outputs.json` は gzip+base64 (`AMPLIFY_OUTPUTS_GZ_B64`) として CDK 経由で Amplify Hosting に渡す（5500 文字上限のため gzip 必須）
+  - `web/next.config.ts` で `turbopack.root` 固定 + `typescript.ignoreBuildErrors` で Amplify Hosting ビルド対応
+  - 本番 URL: `~/.secrets/chicken-knowledge-rag.env` の `AMPLIFY_HOSTING_URL` 参照
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
 
