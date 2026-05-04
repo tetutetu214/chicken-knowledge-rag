@@ -4,18 +4,15 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-04 (Phase 1.5 B-3 前半 完了。AppSync chat resolver + Cognito 認証必須化 + 旧 Lambda 撤去まで完了。**PR #9 オープン中・レビュー待ち**)
+最終更新: 2026-05-04 (Phase 1.5 B-3 前半 完了。**PR #9 マージ済み**、main は merge commit `ec0b76c` で最新化、ブランチ整理済み)
 
 ### 次回セッション開始時にやること
 
-1. **PR #9 を確認・マージ** — https://github.com/tetutetu214/chicken-knowledge-rag/pull/9
-   - レビュー観点: 認証強化 / KB 必須化 / 旧 Lambda 削除の3点
-   - マージ後: `git switch main && git pull` で main を最新化、`feature/appsync-conversation` ブランチは削除可
-2. **次の着手対象を選ぶ** (どれから着手するかは てつてつ判断):
+1. **次の着手対象を選ぶ** (どれから着手するかは てつてつ判断):
    - (a) **B-3 後半**: マルチスレッドUI 実装 ← 当初要件、新ブランチ `feature/multi-thread-ui`
    - (b) **B-4**: ナレッジ投稿フォーム ← `feature/knowledge-form`
    - (c) **B-5**: Amplify Hosting にデプロイ (奥さんへの公開URL) ← 認証強化済みなので可能
-3. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
+2. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
 
 ### 現在の構成スナップショット
 
