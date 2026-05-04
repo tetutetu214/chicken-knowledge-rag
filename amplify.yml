@@ -1,0 +1,35 @@
+# Amplify Hosting ビルド仕様 (monorepo: web/ 配下に Next.js アプリ)
+# 公式ドキュメント: https://docs.aws.amazon.com/amplify/latest/userguide/monorepo-configuration.html
+#
+# 前提:
+# - Amplify アプリで `AMPLIFY_MONOREPO_APP_ROOT=web` が CDK 経由で自動セットされる
+# - 環境変数 `AMPLIFY_OUTPUTS_GZ_B64` (gzip + base64 化した amplify_outputs.json) も CDK 経由でセットされる
+#   ローカルでは `gzip -c amplify_outputs.json | base64 -w0` で生成、~/.secrets/chicken-knowledge-rag.env に保管
+# - Amplify Hosting の環境変数は 1 個 5500 文字上限のため gzip 圧縮が必須 (生 base64 だと 15K 文字で超過する)
+# - Sandbox を再デプロイした際は AMPLIFY_OUTPUTS_GZ_B64 も更新して infra を再 deploy
+#
+# 出力: web/out/ の静的サイト (Next.js `output: 'export'` モード)
+version: 1
+applications:
+  - appRoot: web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            # amplify_outputs.json を gzip+base64 環境変数から復元して web/ ディレクトリ直下に配置する
+            # web/app/ConfigureAmplifyClientSide.tsx は '../amplify_outputs.json' で参照する
+            # (turbopack.root を web/ に固定しているため、web/ の外部にある JSON を import で解決できないため)
+            - if [ -z "$AMPLIFY_OUTPUTS_GZ_B64" ]; then echo "ERROR AMPLIFY_OUTPUTS_GZ_B64 env var is not set"; exit 1; fi
+            - echo "$AMPLIFY_OUTPUTS_GZ_B64" | base64 -d | gunzip > amplify_outputs.json
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: out
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*
