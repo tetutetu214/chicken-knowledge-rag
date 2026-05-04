@@ -16,10 +16,11 @@ applications:
       phases:
         preBuild:
           commands:
-            # amplify_outputs.json を gzip+base64 環境変数から復元してリポジトリルートに配置する
-            # web/app/* は '../../amplify_outputs.json' で参照しているため、ビルドコンテキスト (web/) の親ディレクトリに置く
+            # amplify_outputs.json を gzip+base64 環境変数から復元して web/ ディレクトリ直下に配置する
+            # web/app/ConfigureAmplifyClientSide.tsx は '../amplify_outputs.json' で参照する
+            # (turbopack.root を web/ に固定しているため、web/ の外部にある JSON を import で解決できないため)
             - if [ -z "$AMPLIFY_OUTPUTS_GZ_B64" ]; then echo "ERROR AMPLIFY_OUTPUTS_GZ_B64 env var is not set"; exit 1; fi
-            - echo "$AMPLIFY_OUTPUTS_GZ_B64" | base64 -d | gunzip > ../amplify_outputs.json
+            - echo "$AMPLIFY_OUTPUTS_GZ_B64" | base64 -d | gunzip > amplify_outputs.json
             - npm ci
         build:
           commands:

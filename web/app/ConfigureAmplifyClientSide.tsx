@@ -3,7 +3,7 @@
 import { Amplify } from 'aws-amplify';
 import { I18n } from 'aws-amplify/utils';
 import { translations } from '@aws-amplify/ui-react';
-import outputs from '../../amplify_outputs.json';
+import outputs from '../amplify_outputs.json';
 
 Amplify.configure(outputs);
 
