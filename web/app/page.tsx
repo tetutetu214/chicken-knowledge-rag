@@ -66,6 +66,8 @@ export default function Home() {
     const [question, setQuestion] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // スマホ用: 左ペイン (サイドバー) の表示・非表示。PC (md以上) では常に表示。
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const showError = (label: string, e: unknown) => {
@@ -362,7 +364,28 @@ export default function Home() {
 
     return (
         <main className="min-h-screen bg-zinc-50 dark:bg-zinc-900 flex">
-            <aside className="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-screen sticky top-0">
+            {/* スマホ用: ハンバーガーメニューボタン (md未満で表示) */}
+            <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden fixed top-3 left-3 z-40 p-2 bg-white dark:bg-zinc-800 rounded-md shadow border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200"
+                aria-label="メニューを開く"
+            >
+                ☰
+            </button>
+            {/* スマホ用: サイドバー展開時の背景オーバーレイ。タップで閉じる */}
+            {sidebarOpen && (
+                <div
+                    className="md:hidden fixed inset-0 z-30 bg-black/50"
+                    onClick={() => setSidebarOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+            <aside
+                className={`w-72 shrink-0 flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 fixed inset-y-0 left-0 z-40 md:sticky md:top-0 md:z-auto transition-transform ${
+                    sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+                }`}
+            >
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
                     <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
                         🐓 Cocco RAG
@@ -372,7 +395,10 @@ export default function Home() {
                     </p>
                 </div>
                 <button
-                    onClick={() => void createThread()}
+                    onClick={() => {
+                        void createThread();
+                        setSidebarOpen(false);
+                    }}
                     className="m-3 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold"
                 >
                     + 新しい会話
@@ -391,7 +417,10 @@ export default function Home() {
                                     ? 'bg-zinc-200 dark:bg-zinc-800'
                                     : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                             }`}
-                            onClick={() => setActiveId(t.id)}
+                            onClick={() => {
+                                setActiveId(t.id);
+                                setSidebarOpen(false);
+                            }}
                         >
                             <span className="text-sm text-zinc-800 dark:text-zinc-200 truncate flex-1">
                                 {t.title}
@@ -423,7 +452,7 @@ export default function Home() {
             </aside>
 
             <section className="flex-1 flex flex-col min-h-screen">
-                <div className="flex-1 overflow-y-auto px-4 py-6">
+                <div className="flex-1 overflow-y-auto px-4 pt-14 md:pt-6 pb-6">
                     <div className="max-w-3xl mx-auto space-y-4">
                         {!activeId && (
                             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 text-zinc-600 dark:text-zinc-400 text-sm">
