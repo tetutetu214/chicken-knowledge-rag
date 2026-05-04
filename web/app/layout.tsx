@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chicken Knowledge RAG",
-  description: "ペット鶏100羽以上との暮らしを支援するRAGエージェント",
+  title: "Cocco RAG",
+  description: "にわとりとの暮らしを支援するRAGエージェント",
 };
 
 export default function RootLayout({
