@@ -10,6 +10,7 @@ import { createIamResources } from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
+import { createHosting } from './infra/hosting';
 
 /**
  * 環境変数から必須値を取得する。未設定なら明示的にエラーで止める。
@@ -30,6 +31,8 @@ const requireEnv = (name: string): string => {
 
 const notificationEmail = requireEnv('NOTIFICATION_EMAIL');
 const budgetLimitUsd = parseInt(requireEnv('BUDGET_MONTHLY_LIMIT_USD'), 10);
+const hostingBranchName = requireEnv('HOSTING_BRANCH_NAME');
+const amplifyOutputsGzB64 = requireEnv('AMPLIFY_OUTPUTS_GZ_B64');
 
 // Amplify Gen2 のベース定義 (auth: Cognito, data: AppSync + DynamoDB, functions: chat / summarize)
 const backend = defineBackend({
@@ -148,6 +151,17 @@ for (const modelName of ['Conversation', 'Message']) {
     }
 }
 
+// === Amplify Hosting (静的サイト配信) ===
+// GitHub PAT は Secrets Manager (chicken-rag/github-token) から CDK 内で参照する。
+// AMPLIFY_OUTPUTS_B64 はビルド時に preBuild フェーズで amplify_outputs.json に展開される。
+const { app: hostingApp } = createHosting(infraStack, {
+    githubOwner: 'tetutetu214',
+    githubRepo: 'chicken-knowledge-rag',
+    githubTokenSecretName: 'chicken-rag/github-token',
+    branchName: hostingBranchName,
+    amplifyOutputsGzB64,
+});
+
 // 後続 Step で参照する ARN を amplify_outputs.json に書き出す
 backend.addOutput({
     custom: {
@@ -163,5 +177,7 @@ backend.addOutput({
         dataSourceId: dataSource.attrDataSourceId,
         chatFunctionName: chatLambda.functionName,
         summarizeFunctionName: summarizeLambda.functionName,
+        amplifyHostingAppId: hostingApp.appId,
+        amplifyHostingDefaultDomain: hostingApp.defaultDomain,
     },
 });
