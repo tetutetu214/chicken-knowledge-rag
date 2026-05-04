@@ -5,6 +5,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { chatHandler } from './functions/chat-handler/resource';
+import { summarizeHandler } from './functions/summarize-handler/resource';
 import { createIamResources } from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
@@ -30,11 +31,12 @@ const requireEnv = (name: string): string => {
 const notificationEmail = requireEnv('NOTIFICATION_EMAIL');
 const budgetLimitUsd = parseInt(requireEnv('BUDGET_MONTHLY_LIMIT_USD'), 10);
 
-// Amplify Gen2 のベース定義 (auth: Cognito, data: AppSync + DynamoDB)
+// Amplify Gen2 のベース定義 (auth: Cognito, data: AppSync + DynamoDB, functions: chat / summarize)
 const backend = defineBackend({
     auth,
     data,
     chatHandler,
+    summarizeHandler,
 });
 
 // CDK 拡張: IAM / Budget 等のインフラリソースを同じ Stack に追加
@@ -71,14 +73,34 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
 const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
 const conversationModelId = 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
-const conversationModelArn =
-    `arn:aws:bedrock:${region}:${accountId}:inference-profile/${conversationModelId}`;
 
-// Amplify が生成した chat Lambda 実行ロールに、Bedrock KB / Inference Profile 呼び出し権限を追加する。
-// resources.lambda は IFunction として返るため、具象 Function 型に cast して addEnvironment を呼ぶ。
+// Bedrock 呼び出し権限を Lambda 実行ロールに付与する共通ヘルパ。
+// chat / summarize 両方が Inference Profile 経由で Haiku 4.5 を呼ぶため共有。
+const grantBedrockInvoke = (role: iam.IRole): void => {
+    role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+            sid: 'BedrockInferenceProfileInvoke',
+            actions: [
+                'bedrock:InvokeModel',
+                'bedrock:GetInferenceProfile',
+                'bedrock:UseInferenceProfile',
+            ],
+            resources: [
+                `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
+                `arn:aws:bedrock:${region}::foundation-model/*`,
+                // CRIS は他リージョンの foundation-model も呼ぶため広めに許可
+                'arn:aws:bedrock:*::foundation-model/*',
+            ],
+        }),
+    );
+};
+
+// === chat Lambda ===
 const chatLambda = backend.chatHandler.resources.lambda as lambda.Function;
-chatLambda.addEnvironment('KNOWLEDGE_BASE_ID', knowledgeBase.attrKnowledgeBaseId);
-chatLambda.addEnvironment('MODEL_ARN', conversationModelArn);
+chatLambda.addEnvironment(
+    'KNOWLEDGE_BASE_ID',
+    knowledgeBase.attrKnowledgeBaseId,
+);
 chatLambda.addEnvironment('MODEL_ID', conversationModelId);
 
 const chatLambdaRole = chatLambda.role;
@@ -89,32 +111,42 @@ if (!chatLambdaRole) {
 chatLambdaRole.addToPrincipalPolicy(
     new iam.PolicyStatement({
         sid: 'BedrockKnowledgeBaseQuery',
-        actions: ['bedrock:Retrieve', 'bedrock:RetrieveAndGenerate'],
+        actions: ['bedrock:Retrieve'],
         resources: [
             `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`,
         ],
     }),
 );
-
-chatLambdaRole.addToPrincipalPolicy(
-    new iam.PolicyStatement({
-        sid: 'BedrockInferenceProfileInvoke',
-        actions: [
-            'bedrock:InvokeModel',
-            'bedrock:GetInferenceProfile',
-            'bedrock:UseInferenceProfile',
-        ],
-        resources: [
-            `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
-            `arn:aws:bedrock:${region}::foundation-model/*`,
-            // CRIS は他リージョンの foundation-model も呼ぶため広めに許可
-            'arn:aws:bedrock:*::foundation-model/*',
-        ],
-    }),
-);
+grantBedrockInvoke(chatLambdaRole);
 
 // chat Lambda が KB 作成後に呼び出せるよう依存関係を追加
 chatLambda.node.addDependency(knowledgeBase);
+
+// === summarize Lambda ===
+const summarizeLambda = backend.summarizeHandler.resources.lambda as lambda.Function;
+summarizeLambda.addEnvironment('MODEL_ID', conversationModelId);
+
+const summarizeLambdaRole = summarizeLambda.role;
+if (!summarizeLambdaRole) {
+    throw new Error('summarizeHandler の Lambda 実行ロールが未生成');
+}
+grantBedrockInvoke(summarizeLambdaRole);
+
+// === DynamoDB TTL 設定 (Conversation / Message) ===
+// Amplify Gen2 が a.model() から生成する AmplifyDynamoDBTable カスタムリソースに対して、
+// CDK escape hatch で timeToLiveAttribute を後付けで設定する。
+// 属性名 expiresAt (Unix epoch seconds) は a.model() で integer 型として宣言済み。
+// レコード作成時にフロント側で「90日後の epoch 秒」をセットすれば自動削除される。
+const cfnTables = backend.data.resources.cfnResources.amplifyDynamoDbTables;
+for (const modelName of ['Conversation', 'Message']) {
+    const cfnTable = cfnTables[modelName];
+    if (cfnTable) {
+        cfnTable.timeToLiveAttribute = {
+            attributeName: 'expiresAt',
+            enabled: true,
+        };
+    }
+}
 
 // 後続 Step で参照する ARN を amplify_outputs.json に書き出す
 backend.addOutput({
@@ -130,5 +162,6 @@ backend.addOutput({
         knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
         dataSourceId: dataSource.attrDataSourceId,
         chatFunctionName: chatLambda.functionName,
+        summarizeFunctionName: summarizeLambda.functionName,
     },
 });
