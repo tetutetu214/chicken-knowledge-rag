@@ -4,14 +4,19 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-04 (Phase 1.5 **B-5 完了**。Amplify Hosting CDK 化 + 静的エクスポート + 本番URL動作確認まで完了、ブランチ `feature/amplify-hosting`)
+最終更新: 2026-05-05 (Phase 1.5 **B-5 + リブランド + スマホ対応 完了**。PR #11/#12/#14 main マージ済み、現在 main クリーン)
 
 ### 次回セッション開始時にやること
 
-1. **PR をマージ**: B-5 PR をマージ → main 最新化 → `feature/amplify-hosting` ブランチ削除
-2. **次の着手対象**: B-4 ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
-3. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
-4. **sandbox 実行時の注意**: 必ず `npx ampx sandbox --outputs-out-dir web` で実行する（amplify_outputs.json を web/ 配下に出力する設計）
+1. **次の着手対象**: B-4 ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
+2. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
+3. **sandbox 実行時の注意**: 必ず `npx ampx sandbox --outputs-out-dir web` で実行する（amplify_outputs.json を web/ 配下に出力する設計）
+
+### 直近の追加作業 (B-5 後にmainで実施済み)
+
+- PR #11 `feature/amplify-hosting`: B-5 Amplify Hosting CDK 化 (マージ済み)
+- PR #12 `feature/concierge-rebrand`: アプリ名 → **Cocco RAG**、サイドバーに「コケ先輩」キャラ表示、systemPrompt に語尾「コケ」指示を追加 (マージ済み)
+- PR #14 `feature/mobile-responsive`: 左ペインを md (768px) 未満でハンバーガーメニュー化、スマホ閲覧対応 (マージ済み)
 
 ### 現在の構成スナップショット
 
@@ -196,6 +201,14 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - `amplify_outputs.json` は gzip+base64 (`AMPLIFY_OUTPUTS_GZ_B64`) として CDK 経由で Amplify Hosting に渡す（5500 文字上限のため gzip 必須）
   - `web/next.config.ts` で `turbopack.root` 固定 + `typescript.ignoreBuildErrors` で Amplify Hosting ビルド対応
   - 本番 URL: `~/.secrets/chicken-knowledge-rag.env` の `AMPLIFY_HOSTING_URL` 参照
+- [x] アプリ名を **Cocco RAG** にリブランド + 「コケ先輩」キャラ実装（PR #12、2026-05-04）
+  - `web/app/layout.tsx` の title / description 変更（「にわとりとの暮らしを支援するRAGエージェント」）
+  - `web/app/page.tsx` のロゴを「🐓 Cocco RAG」、サブテキスト「にわとり飼育アシスタント　コケ先輩」
+  - `amplify/functions/chat-handler/handler.ts` の systemPrompt に**コケ先輩キャラ設定 + 全文の語尾「コケ」指示**を追加（警告メッセージ含む全文に適用）
+- [x] スマホ対応 — 左ペインをハンバーガーメニュー化（PR #14、2026-05-04）
+  - md (768px) 以上で常時表示、未満で fixed + transform でスライド出し入れ
+  - 左上にハンバーガーボタン (☰)、背景オーバーレイ (z-30, bg-black/50) でタップ閉じ
+  - スレッド選択・新規会話ボタンタップで自動でサイドバーを閉じる UX
 
 ## Step 6: ナレッジ投稿フォーム（Phase 1.5）
 

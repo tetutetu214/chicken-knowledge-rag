@@ -388,6 +388,32 @@
 - **採用根拠**: 型チェックは `ampx sandbox` の `Running type checks...` フェーズが backend 全体 (amplify/ 含む) を見るため、Amplify Hosting 側で重ねて走らせる必要なし。フロント側の型チェックは別途 `cd web && npx tsc --noEmit` で担保可能。
 - **教訓**: Next.js 16 + Turbopack は従来の Next.js と挙動が違う部分がある (`web/AGENTS.md` の警告どおり)。複数の対処を試した順序を時系列で残すと再発時に最短ルートが分かる。
 
+### 2026-05-04: 決定事項 — アプリ名を「Cocco RAG」にリブランド + 「コケ先輩」キャラ実装
+
+- **決定**: アプリ名を `Chicken Knowledge RAG` から **Cocco RAG** に変更し、サイドバーに「コケ先輩」というキャラを表示。chat-handler の systemPrompt にキャラ設定 + **全文の語尾を「コケ」で終える指示**を追加。
+- **理由**: 配偶者が日常的に使うペット鶏アシスタントとして、無機質な技術名より親しみやすいネーミングが UX に効く。命を扱うシリアス領域だが、入口の柔らかさは継続利用率に直結する。
+- **影響範囲**:
+  - `web/app/layout.tsx`: title「Cocco RAG」、description「にわとりとの暮らしを支援するRAGエージェント」
+  - `web/app/page.tsx`: ロゴ「🐓 Cocco RAG」、サブテキスト「にわとり飼育アシスタント　コケ先輩」
+  - `amplify/functions/chat-handler/handler.ts` の systemPrompt: コケ先輩キャラ設定 + 「すべての文末に必ず『コケ』を付ける」指示。**KB ヒットなし時の警告メッセージや専門家相談を促す末尾文も含めて全文に適用**
+- **トレードオフ**:
+  - 語尾「コケ」を強制するため、引用元の正確な日本語表現と若干乖離する可能性。事実 (出典・ページ番号・専門家確認の促し) は精度最優先のまま、語尾だけキャラを被せる方針
+  - リブランド名はリポジトリ名 (chicken-knowledge-rag) や Stack 名 (chickenknowledgerag) には反映しない (リソース ID 変更は KB 再作成リスクが大きい)
+- **教訓**: UI 文言・キャラ設定は systemPrompt に閉じ込めれば、Lambda コード・データモデル・KB を一切触らずに性格を変えられる。今後のチューニング (Step 7) でも「文体」と「事実精度」は別レイヤで扱う。
+
+### 2026-05-04: 決定事項 — スマホ対応は CSS のみで実装（モバイルアプリ化はしない）
+
+- **決定**: 左ペイン (サイドバー) を **md (768px) 以上で常時表示、未満では fixed + transform でスライド出し入れ**するハンバーガーメニュー UX に変更。React Native 等のモバイルアプリ化は採用しない。
+- **理由**: 配偶者の主利用デバイスがスマホで、左ペイン固定だとメイン領域が潰れる。Tailwind の `md:` ブレイクポイントと `translate-x-0 / -translate-x-full` の切替で実装でき、追加依存ゼロ・ビルドサイズ増加なし。
+- **採用 UX**:
+  - 左上にハンバーガーボタン (☰) を `md:hidden fixed top-3 left-3` で配置
+  - 開閉は React state `sidebarOpen` で制御、`<aside>` の class を `fixed md:sticky` 切替
+  - 背景オーバーレイ (`fixed inset-0 z-30 bg-black/50`) でタップで閉じる
+  - スレッド選択・新規会話ボタンタップ時にも `setSidebarOpen(false)` で自動で閉じる (タップ→続けて入力したい動線をスムーズに)
+  - メイン領域に `pt-14 md:pt-6` を追加してハンバーガー分の余白確保
+- **トレードオフ**: PWA 化やオフライン対応は未対応 (現状 Amplify Hosting + AppSync 必須なのでオフラインは設計外)。実機での触感差 (iOS Safari と Android Chrome) は本番 URL で確認するフェーズに送る。
+- **教訓**: 個人利用のクローズドシステムでは「Tailwind だけで対応」が最速かつ低コスト。React Native や Capacitor は配信導線・ビルド・審査の追加コストが大きく、家族2名規模では過剰。
+
 ### 2026-05-04: ハマりどころ — Amplify::Branch 作成直後の初回ビルドは autoBuild でも自動キックされない
 
 - **症状**: CDK で `app.addBranch(name, { autoBuild: true })` で作成しても、CFn 完了直後に初回ビルドが起動しない (`aws amplify list-jobs` が空)。
