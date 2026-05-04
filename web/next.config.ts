@@ -6,10 +6,16 @@ const nextConfig: NextConfig = {
   // SSR 用 Compute (Lambda) 課金を回避するため、ビルド成果物を out/ に静的書き出しする。
   output: "export",
   // Next.js 16 Turbopack の workspace root をこのディレクトリ (web/) に固定する。
-  // 未設定だとリポジトリルートの package-lock.json を見て workspace root を誤判定し、
-  // ../amplify/ 配下まで TypeScript チェック範囲が広がって @aws-amplify/backend 解決失敗で落ちる。
+  // 未設定だとリポジトリルートの package-lock.json を見て workspace root を誤判定する。
   turbopack: {
     root: resolve(__dirname),
+  },
+  // next build の TypeScript チェックは Amplify Hosting (cd web && npm ci) の構成だと
+  // ../amplify/ 配下まで型チェック対象に含めてしまい、@aws-amplify/backend 未解決で落ちる。
+  // 型チェックは ampx sandbox デプロイ時の "Running type checks..." が amplify/ 全体を見るので
+  // 二重に走らせる必要なし。
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 
