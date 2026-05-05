@@ -425,10 +425,20 @@
 - **#17 の構造に手を入れない理由**: #17 は「評価する仕組みを作る」インフラタスクで、「何を評価するか (= その時点の最新コード)」は実行時に決まる。今後 #20 (sidecar metadata) や retrieval チューニングで対象が変わるたびに #17 を書き換えるのは構造的におかしい。よって #17 本文修正は不要、運用ルールで吸収する。
 - **着手前確認事項の回答** (てつてつ判断、2026-05-05):
   1. ジャッジモデル: **Sonnet 4.6** (`global.anthropic.claude-sonnet-4-6`) — 月次バッチでコストインパクト小、ジャッジは精度最重視
-  2. evaluation-handler 言語: **TypeScript** (既存 chat-handler / summarize-handler に揃える、書ければの前提)
+  2. evaluation-handler 言語: **Python 3.12 + Lambda Container Image** (下記「言語選択の調査結果」参照、当初 TS 候補だったが調査の結果 Python に確定)
   3. EventBridge cron: **毎月1日 09:00 JST** (`cron(0 0 1 * ? *)` UTC) のまま
   4. testset v1 の15問: **そのまま v1 リリース** (テストのためのテストを作るより、まず実スコアを取って判断材料にする)
-- **TS 採用にあたっての追加検討事項**: Ragas 公式は Python 実装。TS では (a) Bedrock 内蔵評価 (Knowledge Base evaluation) で代替、(b) ragas-ts を使う、(c) Ragas の4指標を自前で TS 実装、の3択が現実的。Issue #17 着手時に最初の調査ステップで方式確定する (Issue 本文 §実装手順4「言語選択を確定する」のステップに対応)。
+- **言語選択の調査結果 (TS → Python 確定)**: 当初「既存 Lambda が TS なので揃える」候補だったが、Ragas そのものを調べた結果 Python 一択と判明。
+  - **Ragas 公式 (`vibrantlabsai/ragas`)**: 最新 0.4.3 (2026-01-13)、**Python 専用** (>=3.9)
+  - **TS port の実態**: `@ikrigel/ragas-lib-typescript` は★3・単独メンテのコミュニティ製、Bedrock 統合なし、指標名も公式と差異 ("Relevance" vs "Answer Relevancy")。"independent TypeScript implementation" と自称しており公式 port ではない。命を扱うシステムの評価基盤として依存するのは構造的にリスク
+  - **AWS 公式パターンが Python で確立**: AWS Blog "Evaluate RAG responses with Amazon Bedrock, LlamaIndex and RAGAS" + `aws-samples/aws-generativeai-partner-samples` の notebook で Sonnet 4.x をジャッジに使うサンプルが公式提供
+  - **配備形式**: Ragas + langchain-aws + datasets + numpy/pandas で 250MB zip 上限を超える可能性が高いため **Lambda Container Image (10GB) 必須**
+  - **教訓**: 言語選択は「既存 Lambda 揃え」より「使うライブラリの公式実装言語」を優先すべき。ライブラリの公式版から外れた瞬間にメンテ責任が自プロジェクトに移る
+- **testset データ構造のマッピング**: Issue 本文の案を Ragas 0.4 の `SingleTurnSample` にほぼ 1:1 で写す
+  - `question` → `user_input`
+  - `expected_answer` → `reference`
+  - `expected_contexts` (キーワード配列) → `reference_contexts` (string list)
+  - `expected_safety_alert` → Ragas 標準4指標の対象外。Issue 本文「含まないもの」の鶏ドメイン固有カスタム指標に該当するため今回は **JSON にメタデータとして残すが評価ロジックには使わない**
 
 ### 2026-05-05: 決定事項 — Issue #18 systemPrompt 改善 (専門家相談のリスク階層化)
 

@@ -269,7 +269,7 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 すべて Issue 切り出し済み。
 
-- [ ] **Issue #17** Ragas 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — **次の着手対象** (2026-05-05 確認事項回答済: ジャッジ Sonnet 4.6 / Lambda 言語 TypeScript / cron 月次 / testset v1 そのまま)
+- [ ] **Issue #17** Ragas 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — **次の着手対象** (2026-05-05 確認事項回答済: ジャッジ Sonnet 4.6 / Lambda 言語 **Python 3.12 + Container Image** (TS port は調査の結果実用に耐えず Python 確定、knowledge.md 参照) / cron 月次 / testset v1 そのまま)
 - [ ] **Issue #16** KB 不足領域分析（KB根拠なし質問の収集→可視化、KB拡充計画の判断材料、KB拡充の経路 [3]）
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
 - [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
