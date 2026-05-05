@@ -4,17 +4,43 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-05 (Phase 1.5 **B-5 + リブランド + スマホ対応 完了**。PR #11/#12/#14 main マージ済み、現在 main クリーン)
+最終更新: 2026-05-05 (Phase 1.5 公開可能ライン到達。Step 5 完了 + リブランド + スマホ対応 完了。Step 6 は会話駆動抽出方針に再定義中、Step 7 は Issue #17 で着手準備中)
 
 ### 次回セッション開始時にやること
 
-1. **次の着手対象**: B-4 ナレッジ投稿フォーム ← `feature/knowledge-form` (Markdownエディタ + S3 + EventBridge自動Ingestion)
+1. **着手対象を選択** (下記「現状の優先度」参照)
 2. **環境準備**: `source ~/.secrets/chicken-knowledge-rag.env`（毎回必須）
 3. **sandbox 実行時の注意**: 必ず `npx ampx sandbox --outputs-out-dir web` で実行する（amplify_outputs.json を web/ 配下に出力する設計）
 
-### 直近の追加作業 (B-5 後にmainで実施済み)
+### KB 拡充の3経路 (重要前提・2026-05-05 確定)
 
-- PR #11 `feature/amplify-hosting`: B-5 Amplify Hosting CDK 化 (マージ済み)
+すべての KB 拡充タスクはこの3経路のどれかに対応する。混同しないこと。
+
+| # | 経路 | 入口 | 出口 | 責任主体 | 関連 |
+|---|---|---|---|---|---|
+| **[1]** | 公的資料追加 | てつてつが資料を探す | S3 docs-bucket → 自動 Ingestion | てつてつ (人手) | 既存運用 (新規実装不要) |
+| **[2]** | 家族ナレッジ追加 | 会話駆動抽出 + 承認 UI | S3 knowledge-bucket → 自動 Ingestion | 家族 | Step 6, Issue #15 |
+| **[3]** | 不足領域分析 | KBミスヒット質問のログ | てつてつへの可視化レポート | システム | Step 7 一部, Issue #16 |
+
+### 現状の優先度
+
+| 優先度 | やること | 種別 |
+|---|---|---|
+| **次 (要選択)** | A: Step 6 設計議論を進める (Issue #15、会話駆動抽出方針の確定) | 要議論 |
+| | B: Step 7 から独立タスクを進める (Issue #17 Ragas / ハクビシン retrieval / Bedrock Guardrails) | 実装 |
+| | C: Issue #13 (モデル切替) | 実装、軽い |
+| **後で** | Step 8 (運用)、Phase 2/3 (画像/会話型ナレッジ蓄積本格版) | 将来 |
+
+### 命名ルール (2026-05-05 合意)
+
+- **B-x 命名は今後新規発行しない** (B-2 欠番、付け方が時系列でないため混乱の元)
+- 公式名は **Step 番号 (Step 6 など)** または **タスク名** で呼ぶ
+- 既存 PR の B-x はそのまま履歴として残す (改名はノイズ)
+- Issue は番号で参照 (#13, #15, #16, #17)
+
+### 直近の追加作業 (Step 5 完了後に main で実施済み)
+
+- PR #11 `feature/amplify-hosting`: Amplify Hosting CDK 化 (マージ済み、当時 B-5 表記)
 - PR #12 `feature/concierge-rebrand`: アプリ名 → **Cocco RAG**、サイドバーに「コケ先輩」キャラ表示、systemPrompt に語尾「コケ」指示を追加 (マージ済み)
 - PR #14 `feature/mobile-responsive`: 左ペインを md (768px) 未満でハンバーガーメニュー化、スマホ閲覧対応 (マージ済み)
 
@@ -68,10 +94,10 @@
 
 ## スコープ対応表
 
-- **A: 最小確認版** = Step 0〜3（AWS Console で動作確認まで）— 5時間枠の必達ライン
-- **B: API疎通版** = A + Step 4 の一部（Lambda + API Gateway で疎通）
-- **C: フロント簡易版** = B + Step 5 の一部（Next.js 1スレッド限定UI）
-- **Phase 1.5** = Step 4後半 + Step 5後半 + Step 6（認証・マルチスレッド・ナレッジ投稿フォーム）
+- **A: 最小確認版** = Step 0〜3（AWS Console で動作確認まで）— 5時間枠の必達ライン (完了)
+- **B: API疎通版** = A + Step 4 の一部（Lambda + API Gateway で疎通）(完了)
+- **C: フロント簡易版** = B + Step 5 の一部（Next.js 1スレッド限定UI）(完了)
+- **Phase 1.5** = Step 4後半 + Step 5後半 + Step 6（認証・マルチスレッド・家族ナレッジ追加）— Step 5 まで完了、Step 6 は再定義中
 - **運用** = Step 7〜8
 
 ## Step 0: プロジェクト初期化（スコープA）
@@ -210,24 +236,46 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - 左上にハンバーガーボタン (☰)、背景オーバーレイ (z-30, bg-black/50) でタップ閉じ
   - スレッド選択・新規会話ボタンタップで自動でサイドバーを閉じる UX
 
-## Step 6: ナレッジ投稿フォーム（Phase 1.5）
+## Step 6: 家族ナレッジ追加機能（Phase 1.5、KB拡充の経路 [2]）
 
-- [ ] Markdownエディタ導入（react-md-editor 等を比較選定）
-- [ ] YAML front matter テンプレート埋め込み
-- [ ] `POST /knowledge` API 実装（Lambda）
-- [ ] Lambda → S3 knowledge-bucket 保存
-- [ ] EventBridge → StartIngestionJob 自動実行確認
-- [ ] ナレッジ品質ガード設計の反映 — Issue #15 (構造化強制 / source_type / カテゴリ別取込ガード)
+**2026-05-05 再定義**: 当初の「自由記述 Markdown 投稿フォーム」単独路線は廃案。会話駆動抽出 (KBあり+ユーザー追加情報パターン) を入口に、起案 → 編集 → 承認 → 保存のフローに組み替える。経緯は Issue #15 と knowledge.md 2026-05-05 を参照。
+
+### 設計議論 (Issue #15 で進行中)
+
+- [ ] 会話駆動抽出の方式確定 ((2) KBあり+ユーザー追加情報パターンに絞る方針が暫定合意)
+- [ ] 抽出ターンの判定アルゴリズム決定 (LLM プロンプト方針)
+- [ ] 必須メタデータ確定 (source_type / category / 確度自己申告など)
+- [ ] 投稿可能カテゴリの確定 (疾病・薬剤・卵食品安全を除外する方針)
+- [ ] systemPrompt 追記文言の起案 (field_knowledge の扱い)
+
+### 実装タスク (設計確定後)
+
+- [ ] 起案用 Lambda 追加 (会話履歴 + KB結果 → Markdown 案生成)
+- [ ] 承認 UI (Next.js、起案 → 編集 → 承認)
+- [ ] 保存 Lambda (S3 knowledge-bucket + メタデータ sidecar)
+- [ ] EventBridge → StartIngestionJob 自動実行ルール
+
+### 廃案 (やらないこと)
+
+- 自由記述 Markdown エディタ単独路線 (短文汚染リスクが構造的に防げない)
+- 投稿前 RAG プレビュー → Phase 3 まで持ち越し
 
 ## Step 7: 精度チューニング（運用フェーズ）
 
+複数の独立タスクが含まれる。Issue で切り出されたものは下記の通り。
+
+### Issue 切り出し済み
+
+- [ ] **Issue #17** RAGAS 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — 設計済み、着手前確認事項あり
+- [ ] **Issue #16** KB 不足領域分析（KB根拠なし質問の収集→可視化、KB拡充計画の判断材料、KB拡充の経路 [3]）
+
+### 単独タスク (Issue 化検討)
+
 - [ ] Bedrock Guardrails 設定（疾病・薬剤・緊急対応・卵食品安全・害獣捕獲カテゴリ、spec.md §5-2 の6カテゴリ）
 - [ ] 専門家確認アラートのカスタムレスポンス設定
-- [ ] システムプロンプト実装（コンテキスト限定回答ポリシー）
-- [ ] RAGAS評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall）
-- [ ] ベースラインスコア取得
+- [ ] システムプロンプト改善（コンテキスト限定回答ポリシー、現在は chat-handler 内で簡易版のみ）
 - [ ] 中型獣類編が「ハクビシン」質問で retrieval されない件の調査（chunk size の見直し or `numberOfResults` 増 or リランカー導入）
-- [ ] PDF メタデータ sidecar 戦略の決定（現状は sidecar 無し、source_type / category を付与するか Phase 1.5 で再設計）
+- [ ] PDF メタデータ sidecar 戦略の決定（現状は sidecar 無し、Step 6 のメタデータ設計と統合）
 
 ## Step 8: 運用・拡張
 
