@@ -144,11 +144,18 @@ grantBedrockInvoke(summarizeLambdaRole);
 // chat-handler を直接 invoke して本番一致の応答を測る (案 C、knowledge.md 参照)。
 // Lambda Container Image で Ragas + langchain-aws + numpy/pandas を配備、
 // EventBridge Scheduler で月次自動実行。
+//
+// 重要: 専用 nested stack (`ChickenRagEvaluation`) に配置する。
+// infraStack に置くと function stack (chat/summarize Lambda) が infraStack の
+// KB を参照する既存依存と組み合わさって循環依存 (CloudformationStackCircularDependencyError)
+// になるため、evaluation だけ独立スタックにして「function/infra → evaluation」の
+// 単方向依存にする。
+const evaluationStack = backend.createStack('ChickenRagEvaluation');
 const {
     evaluationBucket,
     resultsTable: evaluationResultsTable,
     evaluationLambda,
-} = createEvaluationPipeline(infraStack, {
+} = createEvaluationPipeline(evaluationStack, {
     knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
     chatHandlerFunctionName: chatLambda.functionName,
     chatHandlerFunctionArn: chatLambda.functionArn,
