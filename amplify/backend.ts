@@ -72,13 +72,15 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
     });
 
 // 会話 API: AppSync Direct Lambda Resolver (Cognito 認証必須)
-// 回答生成モデルは JP Inference Profile (Claude Haiku 4.5、CRIS必須)
+// 回答生成モデルは Global Inference Profile (Claude Sonnet 4.6、CRIS必須)。
+// JP より Global を選択した理由: 日本リージョン分のみだとピーク時に
+// 429 ThrottlingException リスクがあり、Global は複数リージョン分散でキャパ豊富。
 const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
-const conversationModelId = 'jp.anthropic.claude-haiku-4-5-20251001-v1:0';
+const conversationModelId = 'global.anthropic.claude-sonnet-4-6';
 
 // Bedrock 呼び出し権限を Lambda 実行ロールに付与する共通ヘルパ。
-// chat / summarize 両方が Inference Profile 経由で Haiku 4.5 を呼ぶため共有。
+// chat / summarize 両方が Inference Profile 経由で Sonnet 4.6 を呼ぶため共有。
 const grantBedrockInvoke = (role: iam.IRole): void => {
     role.addToPrincipalPolicy(
         new iam.PolicyStatement({
@@ -93,6 +95,8 @@ const grantBedrockInvoke = (role: iam.IRole): void => {
                 `arn:aws:bedrock:${region}::foundation-model/*`,
                 // CRIS は他リージョンの foundation-model も呼ぶため広めに許可
                 'arn:aws:bedrock:*::foundation-model/*',
+                // Global Inference Profile はリージョン部分が空の ARN も持つため明示追加
+                'arn:aws:bedrock:::foundation-model/*',
             ],
         }),
     );

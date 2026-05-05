@@ -414,6 +414,21 @@
 - **トレードオフ**: PWA 化やオフライン対応は未対応 (現状 Amplify Hosting + AppSync 必須なのでオフラインは設計外)。実機での触感差 (iOS Safari と Android Chrome) は本番 URL で確認するフェーズに送る。
 - **教訓**: 個人利用のクローズドシステムでは「Tailwind だけで対応」が最速かつ低コスト。React Native や Capacitor は配信導線・ビルド・審査の追加コストが大きく、家族2名規模では過剰。
 
+### 2026-05-05: 決定事項 — chat-handler / summarize-handler を Sonnet 4.6 (Global) に切替
+
+- **決定**: 両 Lambda の `conversationModelId` を `jp.anthropic.claude-haiku-4-5-20251001-v1:0` から `global.anthropic.claude-sonnet-4-6` に変更 (Issue #22)。
+- **理由**:
+  - Issue #18 (systemPrompt 改善) の効果検証は、最終的に本番運用するモデル上で測りたい。Haiku 4.5 で効くプロンプトが Sonnet 4.6 で同じように効くとは限らないため、先にモデル切替を完了させる順序とした
+  - JP より Global を選択した理由: 日本リージョン分のみだとピーク時の 429 ThrottlingException リスクがあり、Global は複数リージョン分散でキャパ豊富
+- **コスト影響**: Haiku 4.5 (入力 $1/出力 $5 per 1M tokens) → Sonnet 4.6 (入力 $3/出力 $15) で**約3倍**。家族2名・月100質問想定で月 $1〜2 → $3〜6。予算 $30/月 内に十分収まる。
+- **レイテンシ実測**: AWS CLI 直接呼び出しで **1.17秒** (Sonnet 4.6 Global、ap-northeast-1 経由)。Haiku 4.5 と同等の速度で予想より高速。
+- **IAM ポリシー追加**:
+  - Global Inference Profile が裏で呼ぶ Foundation Model ARN は `arn:aws:bedrock:::foundation-model/anthropic.claude-sonnet-4-6` (リージョン部分が空)
+  - 既存の `arn:aws:bedrock:*::foundation-model/*` ワイルドカードでマッチする可能性は高いが、確実性のため `arn:aws:bedrock:::foundation-model/*` を明示追加
+- **動作確認**: localhost (dev サーバー) で 3パターン (KBヒットあり/なし/履歴あり) 正常動作を確認。
+- **教訓**: Inference Profile を切り替える際は `aws bedrock get-inference-profile` で `models[].modelArn` を確認し、IAM の foundation-model ARN がカバーしているか先に検証する。Global Profile はリージョン空 ARN を持つので注意。
+- **次のアクション**: Issue #18 (systemPrompt 改善) を本モデル上で実装・効果検証する。
+
 ### 2026-05-05: 決定事項 — KB 拡充の3経路を明確化
 
 - **決定**: KB 拡充の経路を以下の3つに分離して責任主体・入口・出口を明確化する。今後の設計議論はこの分類に必ず照らす。
