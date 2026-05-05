@@ -11,6 +11,7 @@ import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
 import { createHosting } from './infra/hosting';
+import { createEvaluationPipeline } from './infra/evaluation';
 
 /**
  * 環境変数から必須値を取得する。未設定なら明示的にエラーで止める。
@@ -139,6 +140,25 @@ if (!summarizeLambdaRole) {
 }
 grantBedrockInvoke(summarizeLambdaRole);
 
+// === Ragas 評価パイプライン (Issue #17) ===
+// chat-handler を直接 invoke して本番一致の応答を測る (案 C、knowledge.md 参照)。
+// Lambda Container Image で Ragas + langchain-aws + numpy/pandas を配備、
+// EventBridge Scheduler で月次自動実行。
+const {
+    evaluationBucket,
+    resultsTable: evaluationResultsTable,
+    evaluationLambda,
+} = createEvaluationPipeline(infraStack, {
+    knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+    chatHandlerFunctionName: chatLambda.functionName,
+    chatHandlerFunctionArn: chatLambda.functionArn,
+    modelId: conversationModelId,
+});
+
+// evaluation Lambda は KB と chat-handler に依存 (どちらも作成後でないと invoke 不可)
+evaluationLambda.node.addDependency(knowledgeBase);
+evaluationLambda.node.addDependency(chatLambda);
+
 // === DynamoDB TTL 設定 (Conversation / Message) ===
 // Amplify Gen2 が a.model() から生成する AmplifyDynamoDBTable カスタムリソースに対して、
 // CDK escape hatch で timeToLiveAttribute を後付けで設定する。
@@ -181,6 +201,9 @@ backend.addOutput({
         dataSourceId: dataSource.attrDataSourceId,
         chatFunctionName: chatLambda.functionName,
         summarizeFunctionName: summarizeLambda.functionName,
+        evaluationBucketName: evaluationBucket.bucketName,
+        evaluationResultsTableName: evaluationResultsTable.tableName,
+        evaluationFunctionName: evaluationLambda.functionName,
         amplifyHostingAppId: hostingApp.appId,
         amplifyHostingDefaultDomain: hostingApp.defaultDomain,
     },
