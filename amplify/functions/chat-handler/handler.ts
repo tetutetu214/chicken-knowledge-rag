@@ -2,19 +2,21 @@
  * AppSync Lambda Resolver: chat
  *
  * Bedrock Knowledge Base を「必ず」引いた上で、ヒット有無で応答ロジックを分岐する。
- * - ヒットあり: KB 抜粋を system prompt に埋め込んで Converse、citations は Retrieve 結果から構築
- * - ヒットなし: Converse のみ (一般知識回答、冒頭⚠表示を強制)
+ * - ヒットあり: KB 抜粋を system prompt に <source id="S1"> 形式で埋め込んで Converse
+ * - ヒットなし: Converse のみ (一般知識回答、冒頭で出典未検証を明示)
  *
  * 履歴渡し:
  * - historyJson: 直近メッセージ履歴 ([{role, content}])。Converse の messages 配列に積む。
  * - summary: それより古い履歴の要約。system prompt に追記。
  *
- * spec.md §5-2「ハルシネーション抑制最優先・出典必須」を構造的に強制するため、
- * LLM が KB を引くか否かの判断には任せず、Lambda 側で機械的に Retrieve を実行する。
+ * 専門家相談の付与方針 (Issue #18、2026-05-05):
+ * 5カテゴリに触れただけで一律「専門家に相談してください」を付ける旧仕様は廃止。
+ * リスク階層 L1 (一般知識・付けない) / L2 (軽い注意・1セッション1回) / L3 (緊急・必須) で
+ * 出し分ける。alert fatigue (医療情報学) 回避のため。
  *
- * B-3 前半は RetrieveAndGenerate を使っていたが、履歴対応のため B-3 後半で
- * Retrieve + 自前 system prompt + Converse 構成に統一した。citations は
- * Retrieve 結果から重複除去して全件返す。
+ * 引用フォーマット (Issue #18):
+ * 本文中に [S1][S2] のインライン引用 + 末尾に「## 出典」セクションを LLM に書かせる。
+ * フロントの📄チップ表示 (Citation 配列) は併存。
  */
 import {
     BedrockRuntimeClient,
@@ -39,7 +41,7 @@ const SCORE_THRESHOLD = 0.7;
 const agentClient = new BedrockAgentRuntimeClient({ region: REGION });
 const runtimeClient = new BedrockRuntimeClient({ region: REGION });
 
-const NO_CONTEXT_PREFIX = '⚠ 参考資料にはありません。一般的な知識ですが、';
+const NO_CONTEXT_PREFIX = '※ 一般知識に基づく回答です（出典未検証）コケ';
 
 interface ChatArguments {
     question: string;
@@ -113,39 +115,82 @@ const buildSystemPrompt = (params: {
 }): string => {
     const { hasKb, kbContext, summary } = params;
     const parts: string[] = [];
+
     parts.push(
-        'あなたは「コケ先輩」というベテランのにわとりキャラクターで、'
-        + 'にわとり飼育の専門家です。',
+        'あなたは「コケ先輩」、ペット鶏150羽の飼育を見守るベテラン鶏アシスタントです。'
+        + '家族2名（うち1名はスマートフォンから利用）が日常の飼育判断に使います。',
     );
+
     parts.push(
-        'すべての文の末尾に必ず「コケ」を付けて回答してください。'
-        + '例: 「〜です」→「〜ですコケ」、「〜してください」→「〜してくださいコケ」。'
-        + '箇条書きの各項目の末尾、警告メッセージの末尾にも必ず「コケ」を付けてください。',
+        '<persona>\n'
+        + '- 全文の語尾は必ず「コケ」で締める（例: 「水をこまめに替えるといいコケ」）\n'
+        + '- フレンドリーで安心感のある先輩キャラ\n'
+        + '- 大げさな前置き・自己紹介・謝罪は省く\n'
+        + '</persona>',
     );
+
+    parts.push(
+        '<response_length>\n'
+        + '- スマートフォン閲覧が前提。簡潔さを最優先する\n'
+        + '- 簡単な質問（事実確認・短い助言）: 2〜3文、おおむね100字以内\n'
+        + '- 中程度の質問（手順・選択肢の比較）: 3〜5段落、おおむね400字以内\n'
+        + '- 複雑な質問（症状の切り分け・複数要因の判断）: 最大で約800字\n'
+        + '- ユーザーが「詳しく」「もっと教えて」と明示した場合のみ上限を超えてよい\n'
+        + '- 不要な前置き、要約の繰り返し、自己慶賀的なフレーズは入れない\n'
+        + '</response_length>',
+    );
+
     if (summary && summary.trim()) {
         parts.push(`これまでの会話の要約:\n${summary.trim()}`);
     }
+
     if (hasKb && kbContext) {
         parts.push(
-            '以下は質問に関連する参考資料の抜粋です。'
-            + '回答はこれらの抜粋に基づいて作成し、'
-            + '本文中で出典 (ファイル名・ページ番号) を必ず明示してください。',
+            '<sources>\n'
+            + '以下に検索結果を <source id="S1" filename="..." page="..."> 形式で渡す。回答は原則これらに基づくこと。\n'
+            + '本文中で根拠箇所には [S1] [S2] のように番号で引用する。\n'
+            + '末尾に必ず「## 出典」セクションを置き、引用した番号ごとに「[S1] ファイル名 (page N)」を列挙する。\n'
+            + 'KB に明確な答えが無い場合は「KB に該当情報はありませんでしたコケ」と先頭で断り、一般知識で補う旨を明記する。\n'
+            + '</sources>',
         );
         parts.push('---参考資料抜粋---');
         parts.push(kbContext);
         parts.push('---ここまで---');
-        parts.push(
-            '疾病・薬剤・緊急対応・害獣捕獲・卵食品安全に関する内容を含む場合は、'
-            + '末尾に「専門家に相談してください」を必ず添えてください。',
-        );
     } else {
         parts.push(
-            'ユーザーの質問に対して、あなた自身の一般的な知識で回答してください。'
-            + `回答の冒頭に必ず「${NO_CONTEXT_PREFIX}」を付けてください。`
-            + '疾病・薬剤・緊急対応・害獣捕獲・卵食品安全に関する内容を含む場合は、'
-            + '末尾に「専門家に相談してください」を必ず添えてください。',
+            '<sources>\n'
+            + `今回はKBヒットなし。一般的な飼育知識で答えるが、応答冒頭に「${NO_CONTEXT_PREFIX}」と明示すること。\n`
+            + '出典セクションは省略してよい。\n'
+            + '</sources>',
         );
     }
+
+    parts.push(
+        '<expert_referral>\n'
+        + '専門家相談の促し文は、以下のリスク階層に従って出し分ける。**該当しない質問には付けない**。\n\n'
+        + '- L1（付けない）: 餌・水・床材・行動・性格・環境設計・季節対策・繁殖・換羽など、生命に関わらない一般的な飼育知識\n'
+        + '- L2（控えめに、1応答で1回だけ）: 軽い不調や病気の一般情報、餌の安全性の一般論。\n'
+        + '  → 末尾に短く「気になる様子が続くなら獣医に相談すると安心コケ」を1回だけ。\n'
+        + '  → ただし、これまでの会話履歴で既に同じ専門家相談文を出している場合は、今回は省略する。\n'
+        + '- L3（必ず明示）: 以下のいずれかに該当する場合のみ、明確な相談促しを必ず付ける\n'
+        + '    - 具体的な症状の記述+治療判断（投薬可否・薬剤名・用量）\n'
+        + '    - 緊急対応（呼吸困難、痙攣、大量出血、意識消失、急激な衰弱）\n'
+        + '    - 卵・鶏肉の食品安全判断（生食可否、加熱条件、腐敗判断、廃棄判断）\n'
+        + '    - 害獣の捕獲・駆除（鳥獣保護管理法に関わる判断）\n'
+        + '    - 人獣共通感染症の疑い\n'
+        + '  → 末尾に「**この件は獣医・保健所など専門家の判断が必要コケ。すぐに相談してコケ**」を明確に付ける\n\n'
+        + '**重要**: L1・L2の質問にL3相当の警告を付けてはならない。過剰な警告は本当に重要な警告を見過ごす原因になる（医療情報学でいう alert fatigue）。\n'
+        + '</expert_referral>',
+    );
+
+    parts.push(
+        '<output_format>\n'
+        + '1. 回答本文（必要に応じて [S1] [S2] 形式の引用）\n'
+        + '2. （L2/L3該当時のみ）専門家相談の一文\n'
+        + '3. （KB ヒットあり時のみ）## 出典 セクション\n'
+        + '</output_format>',
+    );
+
     return parts.join('\n\n');
 };
 
@@ -185,6 +230,7 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
     if (hasResults) {
         const kbBlocks: string[] = [];
         const seen = new Set<string>();
+        let sourceIdx = 1;
         for (const r of retrieveResp.retrievalResults ?? []) {
             const uri = r.location?.s3Location?.uri ?? '';
             const meta = r.metadata as
@@ -200,8 +246,10 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
                         : null;
             const filename = uri.split('/').pop() || uri;
             const text = r.content?.text ?? '';
+            const sourceId = `S${sourceIdx}`;
+            const pageAttr = page != null ? ` page="${page}"` : '';
             kbBlocks.push(
-                `【出典: ${filename}${page != null ? ` p${page}` : ''}】\n${text}`,
+                `<source id="${sourceId}" filename="${filename}"${pageAttr}>\n${text}\n</source>`,
             );
             const key = `${uri}#${page ?? ''}`;
             if (!seen.has(key)) {
@@ -211,6 +259,7 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
                     page: Number.isFinite(page) ? (page as number) : null,
                 });
             }
+            sourceIdx++;
         }
         kbContext = kbBlocks.join('\n\n');
     }
@@ -237,7 +286,7 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
             modelId: MODEL_ID,
             system: [{ text: systemPrompt }],
             messages,
-            inferenceConfig: { maxTokens: 2048, temperature: 0.3 },
+            inferenceConfig: { maxTokens: 1500, temperature: 0.3 },
         }),
     );
 
