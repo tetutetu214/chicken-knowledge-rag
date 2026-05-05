@@ -6,6 +6,6 @@ ragas==0.4.3
 # Ragas は LangchainLLMWrapper でラップされた langchain BaseChatModel を要求するため必須
 langchain-aws==0.2.18
 
-# boto3 は Lambda Container ベースイメージにも同梱されているが、
-# バージョン固定で再現性を担保するため明示
-boto3==1.35.99
+# boto3 は Lambda Container ベースイメージに同梱、かつ langchain-aws が
+# boto3>=1.37.0 を transitive 依存で引き込むため明示指定しない
+# (以前 boto3==1.35.99 を pin したが langchain-aws と衝突したため除去)

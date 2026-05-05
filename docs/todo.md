@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-05 (Phase 1.5 公開可能ライン到達。Step 5 完了 + リブランド + スマホ対応。Step 6 は会話駆動抽出方針に再定義中。Step 7 は #22 (Sonnet 4.6 切替, PR #23) + #18 (systemPrompt リスク階層化, PR #24) 完了、次は #17 (Ragas 評価パイプライン) 着手)
+最終更新: 2026-05-05 (Phase 1.5 公開可能ライン到達。Step 5 完了 + リブランド + スマホ対応。Step 6 は会話駆動抽出方針に再定義中。Step 7 は #22 (Sonnet 4.6, PR #23) + #18 (systemPrompt リスク階層化, PR #24) + #17 (Ragas 評価パイプライン v1, PR 作成中) 完了、ベースライン取得済み。次は #16 KB 不足領域分析)
 
 ### 次回セッション開始時にやること
 
@@ -26,15 +26,14 @@
 
 | Priority | Issue | タイトル | 種別 | 紐づく Step |
 |---|---|---|---|---|
-| **P1** | **#17** | Ragas 評価パイプライン構築 | 実装 (設計済み、次の着手対象) | Step 7 |
-| **P1** | **#16** | KB根拠なし質問のフィードバックループ | 実装 | Step 7 (経路 [3]) |
+| **P1** | **#16** | KB根拠なし質問のフィードバックループ | 実装、#17 ベースラインの cp=0 質問群を inputs に活用可 | Step 7 (経路 [3]) |
 | **P1** | **#21** | ユーザー不満の直接記録機能 (👎+自由記述) | 実装 | Step 7 |
 | **P2** | **#15** | ナレッジ投稿の品質ガード設計 | 設計議論 | Step 6 |
 | **P2** | **#20** | 既存KB 14本に sidecar metadata 付与 | 実装 | Step 7 |
 | **P3** | **#13** | 回答生成モデル動的切替機能 (Haiku/Sonnet) | 実装、軽い | 横断 (#22 とは別物、動的切替) |
 | **P3** | **#19** | 画像入力対応 (症状写真 → Vision LLM → KB) | 実装 | Phase 2 |
 
-直近 close 済 (履歴): **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05)
+直近 close 済 (履歴): **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
 ### 命名ルール (2026-05-05 合意)
 
@@ -269,7 +268,7 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 すべて Issue 切り出し済み。
 
-- [ ] **Issue #17** Ragas 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — **次の着手対象** (2026-05-05 確認事項回答済: ジャッジ Sonnet 4.6 / Lambda 言語 **Python 3.12 + Container Image** (TS port は調査の結果実用に耐えず Python 確定、knowledge.md 参照) / cron 月次 / testset v1 そのまま)
+- [x] **Issue #17** Ragas 評価パイプライン構築 — 2026-05-05 ベースライン取得完了。Run ID `run_20260505_151700` (faithfulness 0.45 / answer_relevancy 0.69 / context_precision 0.13 / context_recall 0.22)。Python 3.12 + Container Image / chat-handler 直接 invoke (案 C) / 独立 nested stack 構成。月次 EventBridge Scheduler 稼働開始。詳細は knowledge.md 参照。PR は `feature/ragas-evaluation-pipeline`
 - [ ] **Issue #16** KB 不足領域分析（KB根拠なし質問の収集→可視化、KB拡充計画の判断材料、KB拡充の経路 [3]）
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
 - [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
