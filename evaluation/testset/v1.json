@@ -1,0 +1,197 @@
+{
+    "version": "v1",
+    "createdAt": "2026-05-05",
+    "system_prompt_version": "e406d9f",
+    "description": "Issue #17 ベースライン用テストセット v1。15問。chat-handler を直接 invoke して評価する (案 C)。",
+    "items": [
+        {
+            "id": "q001",
+            "category": "飼養衛生",
+            "user_input": "100羽以上飼育で必要な届出は？",
+            "reference": "家畜伝染病予防法に基づき毎年2月1日時点の飼養状況を都道府県知事に届出する必要があります。",
+            "reference_contexts": [
+                "家畜伝染病予防法",
+                "飼養状況",
+                "都道府県知事",
+                "2月1日"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q002",
+            "category": "害獣対策",
+            "user_input": "ハクビシンはどうやって鶏を襲いますか？",
+            "reference": "夜間に侵入し、木登り・狭所通過が得意な中型獣類で、鶏の喉を狙うことが多いです。",
+            "reference_contexts": [
+                "ハクビシン",
+                "中型獣類",
+                "木登り",
+                "夜行性"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q003",
+            "category": "害獣対策",
+            "user_input": "カラスから鶏小屋を守る方法を教えてください。",
+            "reference": "上部ネット (目合い5cm以下) + テグス + 死角排除が基本対策です。",
+            "reference_contexts": [
+                "カラス",
+                "上部ネット",
+                "目合い",
+                "テグス"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q004",
+            "category": "鶏小屋建築",
+            "user_input": "150羽の鶏小屋に必要な床面積はどれくらいですか？",
+            "reference": "1羽あたり0.4m²目安で、150羽なら最低60m²必要です。本プロジェクトは120m²確保予定。",
+            "reference_contexts": [
+                "床面積",
+                "飼育密度",
+                "1羽あたり"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q005",
+            "category": "産卵",
+            "user_input": "産卵が急に止まる主な原因は？",
+            "reference": "換羽期、ストレス、日長不足、栄養不足、疾病の可能性などが主な原因です。",
+            "reference_contexts": [
+                "換羽",
+                "日長",
+                "ストレス",
+                "産卵停止"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q006",
+            "category": "疾病",
+            "user_input": "鶏が呼吸困難の症状を見せたらどうすればいいですか？",
+            "reference": "隔離後ただちに獣医師・家畜保健衛生所に連絡してください。鳥インフルエンザ疑いがあれば即通報が必要です。",
+            "reference_contexts": [
+                "呼吸器症状",
+                "鳥インフルエンザ",
+                "家畜保健衛生所"
+            ],
+            "expected_safety_alert": true
+        },
+        {
+            "id": "q007",
+            "category": "疾病",
+            "user_input": "死亡鶏を見つけたらどう対応すればいいですか？",
+            "reference": "短期間に複数死亡なら家畜保健衛生所へ連絡。鳥インフルエンザ特定症状の確認、焼却・埋却処分が必要です。",
+            "reference_contexts": [
+                "死亡",
+                "家畜保健衛生所",
+                "通報",
+                "焼却",
+                "埋却"
+            ],
+            "expected_safety_alert": true
+        },
+        {
+            "id": "q008",
+            "category": "卵食品安全",
+            "user_input": "採卵当日の卵は生食できますか？",
+            "reference": "採卵日の状態が良好であれば可能ですが、サルモネラリスクは常にあります。冷蔵保存を推奨します。",
+            "reference_contexts": [
+                "サルモネラ",
+                "生食",
+                "賞味期限",
+                "冷蔵"
+            ],
+            "expected_safety_alert": true
+        },
+        {
+            "id": "q009",
+            "category": "卵食品安全",
+            "user_input": "賞味期限を3日過ぎた卵は使えますか？",
+            "reference": "賞味期限は生食可能期限です。期限後は加熱調理 (70℃1分以上) で利用可能ですが、状態確認は必須です。",
+            "reference_contexts": [
+                "賞味期限",
+                "加熱調理",
+                "70℃",
+                "食中毒"
+            ],
+            "expected_safety_alert": true
+        },
+        {
+            "id": "q010",
+            "category": "卵料理",
+            "user_input": "卵を一度に大量消費するレシピを教えてください。",
+            "reference": "キッシュ、カステラ、卵焼き重ね、プリンなど10個以上使うレシピがおすすめです。",
+            "reference_contexts": [
+                "大量消費",
+                "レシピ",
+                "キッシュ",
+                "カステラ"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q011",
+            "category": "行動・福祉",
+            "user_input": "鶏の砂浴びにはどんな効果がありますか？",
+            "reference": "寄生虫予防 (ハジラミ等)、羽の油分調整、ストレス軽減の効果があります。",
+            "reference_contexts": [
+                "砂浴び",
+                "寄生虫",
+                "ハジラミ",
+                "福祉"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q012",
+            "category": "個体観察",
+            "user_input": "換羽期の鶏に必要なケアは？",
+            "reference": "高タンパク飼料への切替、ストレス低減、保温配慮が必要です。",
+            "reference_contexts": [
+                "換羽",
+                "タンパク質",
+                "ストレス",
+                "保温"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q013",
+            "category": "飼料・水",
+            "user_input": "鶏1羽あたりの1日の飲水量はどのくらいですか？",
+            "reference": "約200〜400ml が目安です。気温・産卵状況で変動するため、常時清水を確保してください。",
+            "reference_contexts": [
+                "飲水量",
+                "200ml",
+                "気温",
+                "清水"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q014",
+            "category": "鶏小屋設備",
+            "user_input": "鶏小屋の通気はどう確保すればいいですか？",
+            "reference": "上部ベンチレーション + 風下側採気口で換気量を確保します。隙間風は避けてください。",
+            "reference_contexts": [
+                "通気",
+                "ベンチレーション",
+                "アンモニア",
+                "結露"
+            ],
+            "expected_safety_alert": false
+        },
+        {
+            "id": "q015",
+            "category": "メタ",
+            "user_input": "アローカナ・チャボ・烏骨鶏のうち最も卵を産む品種はどれですか？",
+            "reference": "コンテキストに該当情報がない場合は『確認が必要です』と返答すべき (Out-of-domain)。",
+            "reference_contexts": [],
+            "expected_safety_alert": false
+        }
+    ]
+}

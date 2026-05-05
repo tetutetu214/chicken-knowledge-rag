@@ -1,0 +1,11 @@
+# Ragas 評価フレームワーク (Python 公式実装、Issue #17 採用)
+# 0.4.3 は 2026-01-13 リリース、4指標 + EvaluationDataset/SingleTurnSample API
+ragas==0.4.3
+
+# Bedrock を langchain 経由で Ragas のジャッジ LLM / Embedding に差し込むためのアダプタ
+# Ragas は LangchainLLMWrapper でラップされた langchain BaseChatModel を要求するため必須
+langchain-aws==0.2.18
+
+# boto3 は Lambda Container ベースイメージに同梱、かつ langchain-aws が
+# boto3>=1.37.0 を transitive 依存で引き込むため明示指定しない
+# (以前 boto3==1.35.99 を pin したが langchain-aws と衝突したため除去)
