@@ -22,14 +22,17 @@
 | **[2]** | 家族ナレッジ追加 | 会話駆動抽出 + 承認 UI | S3 knowledge-bucket → 自動 Ingestion | 家族 | Step 6, Issue #15 |
 | **[3]** | 不足領域分析 | KBミスヒット質問のログ | てつてつへの可視化レポート | システム | Step 7 一部, Issue #16 |
 
-### 現状の優先度
+### 現状の Open Issue 一覧 (2026-05-05 時点)
 
-| 優先度 | やること | 種別 |
-|---|---|---|
-| **次 (要選択)** | A: Step 6 設計議論を進める (Issue #15、会話駆動抽出方針の確定) | 要議論 |
-| | B: Step 7 から独立タスクを進める (Issue #17 Ragas / ハクビシン retrieval / Bedrock Guardrails) | 実装 |
-| | C: Issue #13 (モデル切替) | 実装、軽い |
-| **後で** | Step 8 (運用)、Phase 2/3 (画像/会話型ナレッジ蓄積本格版) | 将来 |
+| Issue | タイトル | 種別 | 紐づく Step |
+|---|---|---|---|
+| **#13** | 回答生成モデル切替 (Haiku/Sonnet) | 実装、軽い | 横断 |
+| **#15** | ナレッジ投稿の品質ガード設計 | 設計議論 | Step 6 |
+| **#16** | KB根拠なし質問のフィードバックループ | 実装 | Step 7 (経路 [3]) |
+| **#17** | Ragas 評価パイプライン構築 | 実装 (設計済み) | Step 7 |
+| **#18** | systemPrompt 改善 (専門家相談頻度・回答長さ・引用フォーマット) | 実装 | Step 7 |
+| **#19** | 画像入力対応 (症状写真 → Vision LLM → KB) | 実装 | Phase 2 |
+| **#20** | 既存KB 14本に sidecar metadata 付与 | 実装 | Step 7 |
 
 ### 命名ルール (2026-05-05 合意)
 
@@ -262,24 +265,24 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ## Step 7: 精度チューニング（運用フェーズ）
 
-複数の独立タスクが含まれる。Issue で切り出されたものは下記の通り。
+すべて Issue 切り出し済み。
 
-### Issue 切り出し済み
-
-- [ ] **Issue #17** RAGAS 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — 設計済み、着手前確認事項あり
+- [ ] **Issue #17** Ragas 評価パイプライン構築（Faithfulness / Answer Relevancy / Context Precision / Context Recall、ベースラインスコア取得まで） — 設計済み、着手前確認事項あり
 - [ ] **Issue #16** KB 不足領域分析（KB根拠なし質問の収集→可視化、KB拡充計画の判断材料、KB拡充の経路 [3]）
+- [ ] **Issue #18** systemPrompt 改善 (専門家相談頻度の条件化、回答長さ・引用フォーマット統一)
+- [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
 
-### 単独タスク (Issue 化検討)
+### 後で再検討 (今は触らない)
 
-- [ ] Bedrock Guardrails 設定（疾病・薬剤・緊急対応・卵食品安全・害獣捕獲カテゴリ、spec.md §5-2 の6カテゴリ）
-- [ ] 専門家確認アラートのカスタムレスポンス設定
-- [ ] システムプロンプト改善（コンテキスト限定回答ポリシー、現在は chat-handler 内で簡易版のみ）
-- [ ] 中型獣類編が「ハクビシン」質問で retrieval されない件の調査（chunk size の見直し or `numberOfResults` 増 or リランカー導入）
-- [ ] PDF メタデータ sidecar 戦略の決定（現状は sidecar 無し、Step 6 のメタデータ設計と統合）
+- ハクビシン retrieval 改善 → Issue #16 のフィードバック収集後に判断 (個別問題を当てずっぽうに直すより、まず全体像を把握する)
+- Bedrock Guardrails 設定 → Issue #18 の systemPrompt 改善で頻度問題が解消するか先に検証してから判断
 
 ## Step 8: 運用・拡張
 
-- [ ] 配偶者向け簡易マニュアル作成
-- [ ] 月次RAGAS評価のスケジュール化
-- [ ] Phase 2（画像対応）着手判断
-- [ ] Phase 3（会話型ナレッジ蓄積）着手判断
+- [ ] 月次 Ragas 評価のスケジュール化 (Issue #17 の一部)
+- [ ] **Issue #19** Phase 2 画像入力対応 (症状写真 → Vision LLM → KB検索)
+- [ ] Phase 3 (会話型ナレッジ蓄積の本格版) 着手判断 ※Step 6 で会話事後抽出は前倒し済み
+
+### 廃案
+
+- 配偶者向け簡易マニュアル → 不要 (UI が分かりやすければマニュアル不要、2026-05-05 ユーザー判断)
