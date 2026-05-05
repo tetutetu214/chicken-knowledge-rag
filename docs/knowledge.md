@@ -10,6 +10,16 @@
 
 ---
 
+## 学習済み概念 (理解度テスト合格記録)
+
+CLAUDE.md「理解度テストハーネス」ルールで合格した概念を記録する。同じ概念は次回以降テストをスキップしてよい。
+
+- **2026-05-05: Ragas の Faithfulness 指標** — 「回答が retrieval されたコンテキストに基づいているか」を LLM ジャッジ (Sonnet 4.6) が文単位で判定する仕組み。文字列一致 (BLEU/ROUGE 系) ではないことを理解。
+- **2026-05-05: Lambda Container Image を選ぶ判断軸** — 主たる理由は「依存パッケージが zip 上限 250MB を超える」こと。Container は最大10GB まで対応するため Ragas + langchain + numpy/pandas のような大規模依存ツリーが配備できる。cold start 短縮や言語混在回避が目的ではない。
+- **2026-05-05: evaluation-handler が chat-handler を直接 invoke する構成 (案 C) の意味** — 計測対象は「本番 chat-handler が #18 systemPrompt 込みで実際に返す応答の品質」。RetrieveAndGenerate デフォルトを使うとリスク階層警告や引用フォーマットが反映されず、production-faithful にならない。
+
+---
+
 ## 決定事項
 
 ### 2026-05-02: ベクトルストアは S3 Vectors を採用
@@ -439,6 +449,12 @@
   - `expected_answer` → `reference`
   - `expected_contexts` (キーワード配列) → `reference_contexts` (string list)
   - `expected_safety_alert` → Ragas 標準4指標の対象外。Issue 本文「含まないもの」の鶏ドメイン固有カスタム指標に該当するため今回は **JSON にメタデータとして残すが評価ロジックには使わない**
+- **応答生成方式: 案 C (chat-handler Lambda 直接 invoke)** を採用 (Issue 本文の `RetrieveAndGenerate` 案を不採用):
+  - **背景**: Issue 本文の `RetrieveAndGenerate` API は Bedrock デフォルトのプロンプトテンプレートを使うため、#18 で導入したリスク階層 systemPrompt・引用フォーマット (`[S1]`)・「コケ」語尾などが一切反映されない。これでは「本番 chat-handler の精度」を測ったことにならない
+  - **不採用案**: 案 B (chat-handler ロジックを Python に移植) — コード重複が発生し、chat-handler 改修のたびに同期が必要でドリフト不可避
+  - **採用理由**: 案 C は本番一致 (production-faithful)・コード重複なし・chat-handler 改修が即評価に反映される。Lambda → Lambda invoke は boto3 `lambda.invoke()` 1コールで実現でき、追加の認証層は不要 (IAM 権限のみ)
+  - **入力イベント形式**: chat-handler は AppSync Direct Lambda Resolver なので、event.arguments に `{ conversationId, message, ... }` を渡す形。各 testset 質問に対して**新規会話 ID** を毎回生成して履歴なしの単発質問として呼ぶ (会話履歴の影響を排除してベースラインを純粋に測るため)
+  - **トレードオフ**: chat-handler の AppSync resolver イベント形式に依存するため、chat-handler のシグネチャを変えたら evaluation-handler も合わせる必要がある。これは Python 移植 (案 B) より**結合度ははるかに低い**ので許容
 
 ### 2026-05-05: 決定事項 — Issue #18 systemPrompt 改善 (専門家相談のリスク階層化)
 
