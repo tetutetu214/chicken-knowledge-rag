@@ -10,6 +10,17 @@
 
 ---
 
+## 学習済み概念 (理解度テスト合格記録)
+
+CLAUDE.md「理解度テストハーネス」ルールで合格した概念を記録する。同じ概念は次回以降テストをスキップしてよい。
+
+- **2026-05-05: Ragas の Faithfulness 指標** — 「回答が retrieval されたコンテキストに基づいているか」を LLM ジャッジ (Sonnet 4.6) が文単位で判定する仕組み。文字列一致 (BLEU/ROUGE 系) ではないことを理解。
+- **2026-05-05: Lambda Container Image を選ぶ判断軸** — 主たる理由は「依存パッケージが zip 上限 250MB を超える」こと。Container は最大10GB まで対応するため Ragas + langchain + numpy/pandas のような大規模依存ツリーが配備できる。cold start 短縮や言語混在回避が目的ではない。
+- **2026-05-05: evaluation-handler が chat-handler を直接 invoke する構成 (案 C) の意味** — 計測対象は「本番 chat-handler が #18 systemPrompt 込みで実際に返す応答の品質」。RetrieveAndGenerate デフォルトを使うとリスク階層警告や引用フォーマットが反映されず、production-faithful にならない。
+- **2026-05-05: Secrets Manager と SSM Parameter Store の使い分け** — SSM SecureString は AWS KMS (デフォルト aws/ssm) で保存時暗号化される。両者の最大の機能差は「自動ローテーションの有無」で、Secrets Manager だけがその機能を持つ。GitHub PAT は仕組み上ローテーションできないため、本プロジェクトでは Secrets Manager を選ぶ価値がなく、Standard SecureString が無料の SSM Parameter Store を使う方が月額コスト目標 ($20〜30) と整合する。
+
+---
+
 ## 決定事項
 
 ### 2026-05-02: ベクトルストアは S3 Vectors を採用
@@ -414,6 +425,48 @@
 - **トレードオフ**: PWA 化やオフライン対応は未対応 (現状 Amplify Hosting + AppSync 必須なのでオフラインは設計外)。実機での触感差 (iOS Safari と Android Chrome) は本番 URL で確認するフェーズに送る。
 - **教訓**: 個人利用のクローズドシステムでは「Tailwind だけで対応」が最速かつ低コスト。React Native や Capacitor は配信導線・ビルド・審査の追加コストが大きく、家族のみ規模では過剰。
 
+### 2026-05-05: ベースラインスコア取得 — Issue #17 v1 初回実行結果
+
+- **実行**: testset v1 (15問) を `chicken-rag-evaluation-handler` Lambda で評価。Run ID `run_20260505_151700` (run_20260505_150319 もほぼ同値で参考程度)。実行時間は約7分 (LLM ジャッジ呼び出し含む)。
+- **全体スコア**:
+  - **Faithfulness: 0.45** — 回答が retrieval コンテキストに忠実か (中程度)
+  - **Answer Relevancy: 0.69** — 質問の意図に的を射ているか (やや良)
+  - **Context Precision: 0.13** — retrieval 上位の関連性 (**低い**)
+  - **Context Recall: 0.22** — 必要なコンテキスト網羅率 (**低い**)
+- **質問単位の所見** (Context Precision=1.0 を「KB ヒット」と定義):
+  - **KB が機能した質問**: q006 (呼吸困難) cp=1.0/cr=1.0、q009 (賞味期限3日) cp=1.0/cr=0.5。**疾病・卵食品安全カテゴリの一部のみ**
+  - **KB ヒットなし (cp=0) の質問**: 15問中13問。届出・害獣・鶏小屋・産卵・飼料・福祉・通気など**全カテゴリにわたり retrieval が機能していない**
+  - **Faithfulness 高 + KB ヒットなし**: q002 ハクビシン (0.9)、q011 砂浴び (1.0) — LLM 一般知識で精度の高い回答が出ている。chat-handler が「KB なし時は一般知識で答える」モードで機能している証拠
+  - **Faithfulness 0**: q005 産卵停止、q010 大量消費レシピ、q015 品種比較。q010 は KB なしで一般知識回答が抽象的、q015 はメタ問題で「該当情報なし」回答が期待値どおり
+- **Issue #16 (KB 不足領域分析) への接続**:
+  - Context Precision/Recall は LLM 揺らぎを受けない deterministic な指標なので、**KB 不足領域 = cp=0 の質問カテゴリ** として直接特定できる
+  - 今回の v1 testset で「KB 拡充の優先カテゴリ」が即座に可視化された: 届出・害獣・鶏小屋建築・産卵・飼料・福祉・通気
+  - 経路 [1] (公的資料追加) で農水省の鳥獣被害対策・鶏舎建築指針・採卵鶏管理指針などをデータ駆動で優先順位付けできる
+- **Faithfulness vs Context Precision のギャップ解釈**:
+  - Faithfulness 0.45 (中) なのに Context Precision 0.13 (低) は一見矛盾
+  - Ragas 0.4 の Faithfulness は「回答の各主張が retrieval コンテキストから演繹できるか」を判定するが、KB ヒットなしの場合でも LLM 一般知識で出した回答が妥当なら主張ベースで部分点が付く挙動
+  - 意味: 現在の chat-handler は「KB が当たらないときに LLM 一般知識でそれなりに答える」状態。命を扱う質問では危険なので、KB 拡充で Context Precision を上げて Faithfulness の根拠を retrieval 側に寄せる必要がある
+- **次のアクション**:
+  - Issue #16 (不足領域分析) に本ベースラインを inputs として渡す
+  - KB 拡充後に再度 v1 testset で評価し、Context Precision/Recall の上昇を測る
+  - 月次 EventBridge Scheduler が動き始めたので、毎月1日 09:00 JST に自動的にスコア推移が記録される
+
+### 2026-05-05: 知見・ハマりどころ — Issue #17 デプロイ時の循環依存
+
+- **症状**: `npx ampx sandbox` で `[ERROR] [CloudformationStackCircularDependencyError] The CloudFormation deployment failed due to circular dependency found between nested stacks [data, ChickenRagInfra, function]`
+- **原因**: evaluation-handler を `infraStack` (ChickenRagInfra) に置いた結果、Amplify が生成する nested stack 構成と循環:
+  - 既存: `function` stack (chat/summarize Lambda) は環境変数 / IAM 権限で `infra` stack (KB) を参照
+  - 追加: `infra` stack (evaluation Lambda) が `function` stack (chat-handler の name/arn) を参照
+  - これで `infra ⇄ function` の双方向依存が発生
+- **解決**: evaluation pipeline 専用の独立 nested stack `ChickenRagEvaluation` に切り出し、`function/infra → evaluation` の単方向依存にする (`backend.createStack('ChickenRagEvaluation')`)
+- **教訓**: Amplify Gen2 の nested stack 構成では、既存スタック (function/data/infra) を別のスタックから参照する場合、**新規追加リソースは独立した stack に置く** のが安全。"既存 stack に同居する" 設計はクロス参照で循環を生みやすい
+
+### 2026-05-05: 知見・ハマりどころ — Ragas 依存と boto3 衝突
+
+- **症状**: 初回 Container build で `pip ResolutionImpossible: langchain-aws 0.2.18 depends on boto3>=1.37.0` だが requirements.txt に `boto3==1.35.99` を pin していた
+- **解決**: boto3 の明示 pin を削除。Lambda Container ベースイメージ (`public.ecr.aws/lambda/python:3.12`) に boto3 が同梱されており、langchain-aws が transitive dependency として最新 boto3 を引き込むため、明示指定は不要かつ衝突源
+- **教訓**: ラップ層 (langchain-aws) を pin する場合、その transitive dependency と上位 pin を両方握ると衝突する。Lambda Container ベースイメージ同梱パッケージは pin しないのが安全
+
 ### 2026-05-05: 決定事項 — Issue #17 ベースラインスコア取得タイミングと testset versioning ポリシー
 
 - **決定**: Issue #17 (Ragas 評価パイプライン) のベースラインは **#18 マージ後の main コミット (`e406d9f`)** を起点に取得する。Issue #17 本文・設計内容は変更しない。運用ルールのみ追加。
@@ -439,6 +492,12 @@
   - `expected_answer` → `reference`
   - `expected_contexts` (キーワード配列) → `reference_contexts` (string list)
   - `expected_safety_alert` → Ragas 標準4指標の対象外。Issue 本文「含まないもの」の鶏ドメイン固有カスタム指標に該当するため今回は **JSON にメタデータとして残すが評価ロジックには使わない**
+- **応答生成方式: 案 C (chat-handler Lambda 直接 invoke)** を採用 (Issue 本文の `RetrieveAndGenerate` 案を不採用):
+  - **背景**: Issue 本文の `RetrieveAndGenerate` API は Bedrock デフォルトのプロンプトテンプレートを使うため、#18 で導入したリスク階層 systemPrompt・引用フォーマット (`[S1]`)・「コケ」語尾などが一切反映されない。これでは「本番 chat-handler の精度」を測ったことにならない
+  - **不採用案**: 案 B (chat-handler ロジックを Python に移植) — コード重複が発生し、chat-handler 改修のたびに同期が必要でドリフト不可避
+  - **採用理由**: 案 C は本番一致 (production-faithful)・コード重複なし・chat-handler 改修が即評価に反映される。Lambda → Lambda invoke は boto3 `lambda.invoke()` 1コールで実現でき、追加の認証層は不要 (IAM 権限のみ)
+  - **入力イベント形式**: chat-handler は AppSync Direct Lambda Resolver なので、event.arguments に `{ conversationId, message, ... }` を渡す形。各 testset 質問に対して**新規会話 ID** を毎回生成して履歴なしの単発質問として呼ぶ (会話履歴の影響を排除してベースラインを純粋に測るため)
+  - **トレードオフ**: chat-handler の AppSync resolver イベント形式に依存するため、chat-handler のシグネチャを変えたら evaluation-handler も合わせる必要がある。これは Python 移植 (案 B) より**結合度ははるかに低い**ので許容
 
 ### 2026-05-05: 決定事項 — Issue #18 systemPrompt 改善 (専門家相談のリスク階層化)
 
