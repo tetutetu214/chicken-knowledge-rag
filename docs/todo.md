@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-05 (Phase 1.5 公開可能ライン到達。Step 5 完了 + リブランド + スマホ対応。Step 6 は会話駆動抽出方針に再定義中。Step 7 は #22 (Sonnet 4.6, PR #23) + #18 (systemPrompt リスク階層化, PR #24) + #17 (Ragas 評価パイプライン v1, PR 作成中) 完了、ベースライン取得済み。次は #16 KB 不足領域分析)
+最終更新: 2026-05-06 (Issue #16 Phase 1 着手。`feature/kb-miss-logging` で `Message.topScore` 保存基盤を実装中。Phase 2/3 は Phase 1 マージ + 実データ蓄積後に判断)
 
 ### 次回セッション開始時にやること
 
@@ -269,7 +269,16 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 すべて Issue 切り出し済み。
 
 - [x] **Issue #17** Ragas 評価パイプライン構築 — 2026-05-05 ベースライン取得完了。Run ID `run_20260505_151700` (faithfulness 0.45 / answer_relevancy 0.69 / context_precision 0.13 / context_recall 0.22)。Python 3.12 + Container Image / chat-handler 直接 invoke (案 C) / 独立 nested stack 構成。月次 EventBridge Scheduler 稼働開始。詳細は knowledge.md 参照。PR は `feature/ragas-evaluation-pipeline`
-- [ ] **Issue #16** KB 不足領域分析（KB根拠なし質問の収集→可視化、KB拡充計画の判断材料、KB拡充の経路 [3]）
+- [~] **Issue #16 Phase 1** KB 不足領域分析の収集基盤（`feature/kb-miss-logging`、KB拡充の経路 [3] の入口）
+  - [ ] `amplify/data/resource.ts` の `Message` モデルに `topScore: a.float()` を追加（保存先）
+  - [ ] `amplify/data/resource.ts` の `ChatResponse` カスタム型に `topScore: a.float()` を追加（戻り値）
+  - [ ] `amplify/functions/chat-handler/handler.ts` で算出済みの `topScore` を `ChatResponse` に乗せて返す
+  - [ ] `web/app/page.tsx` の assistant メッセージ保存時に `topScore` を保存。`MessageRow` 型と `loadMessages` も追従
+  - [ ] `npx ampx sandbox --once --outputs-out-dir web` で再デプロイ
+  - [ ] KB ヒットなし質問を1件発生させ、DynamoDB の `Message` テーブルに `hasKbResults=false` + `topScore<0.7` で保存されているか AWS Console で確認
+  - [ ] PR 作成 → main にマージ
+- [ ] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— Phase 1 マージ後、1ヶ月程度の実データ蓄積を待ってから着手判断
+- [ ] **Issue #16 Phase 3** LLM 補助による棚卸サイクル — Phase 2 完了後に判断
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
 - [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
 - [ ] **Issue #21** ユーザー不満の直接記録機能 (メッセージ単位の👎+自由記述、#16 と並行収集)
