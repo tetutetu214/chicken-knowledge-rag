@@ -25,6 +25,8 @@ interface MessageRow {
     content: string;
     citations: Citation[];
     hasKbResults: boolean;
+    // KB Retrieve 最大コサイン類似度 (assistant メッセージのみ)。Issue #16 Phase 1。
+    topScore: number | null;
     createdAt: string;
 }
 
@@ -120,6 +122,7 @@ export default function Home() {
                     content: d.content,
                     citations: parseCitations(d.citations),
                     hasKbResults: d.hasKbResults ?? false,
+                    topScore: d.topScore ?? null,
                     createdAt: d.createdAt,
                 }))
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -335,6 +338,7 @@ export default function Home() {
                     content: resp.answer ?? '',
                     citations: citationsForSave,
                     hasKbResults: resp.hasKbResults ?? false,
+                    topScore: resp.topScore ?? null,
                     expiresAt: ttlSeconds(),
                 });
             if (asstMsgErrs && asstMsgErrs.length > 0) {
