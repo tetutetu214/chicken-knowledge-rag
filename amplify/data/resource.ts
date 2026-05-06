@@ -25,6 +25,9 @@ const schema = a.schema({
         answer: a.string().required(),
         citations: a.ref('Citation').array(),
         hasKbResults: a.boolean().required(),
+        // KB Retrieve top-K のうち最大コサイン類似度。Issue #16 KB不足領域分析の入口。
+        // 0〜1.0、SCORE_THRESHOLD (0.7) 未満は KB根拠なし扱い。
+        topScore: a.float(),
     }),
 
     SummarizeResponse: a.customType({
@@ -55,6 +58,9 @@ const schema = a.schema({
             // [{uri: string, page: number | null}] 構造を JSON で保持。
             citations: a.json(),
             hasKbResults: a.boolean(),
+            // KB Retrieve top-K の最大コサイン類似度 (assistant メッセージのみ意味あり)。
+            // Issue #16 Phase 2 で /insights ダッシュボードから集計する。
+            topScore: a.float(),
             expiresAt: a.integer(),
         })
         .authorization((allow) => [allow.owner()]),
