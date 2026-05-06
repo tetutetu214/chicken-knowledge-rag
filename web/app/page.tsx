@@ -25,6 +25,8 @@ interface MessageRow {
     content: string;
     citations: Citation[];
     hasKbResults: boolean;
+    // KB Retrieve 最大コサイン類似度 (assistant メッセージのみ)。Issue #16 Phase 1。
+    topScore: number | null;
     createdAt: string;
 }
 
@@ -120,6 +122,7 @@ export default function Home() {
                     content: d.content,
                     citations: parseCitations(d.citations),
                     hasKbResults: d.hasKbResults ?? false,
+                    topScore: d.topScore ?? null,
                     createdAt: d.createdAt,
                 }))
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -335,6 +338,7 @@ export default function Home() {
                     content: resp.answer ?? '',
                     citations: citationsForSave,
                     hasKbResults: resp.hasKbResults ?? false,
+                    topScore: resp.topScore ?? null,
                     expiresAt: ttlSeconds(),
                 });
             if (asstMsgErrs && asstMsgErrs.length > 0) {
@@ -471,8 +475,8 @@ export default function Home() {
                                 className="bg-white dark:bg-zinc-800 rounded-lg shadow p-5"
                             >
                                 {m.role === 'user' ? (
-                                    <div className="flex gap-3">
-                                        <div className="font-semibold text-blue-700 dark:text-blue-400 shrink-0">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="font-semibold text-blue-700 dark:text-blue-400">
                                             あなた:
                                         </div>
                                         <div className="flex-1 whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
@@ -481,9 +485,9 @@ export default function Home() {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col gap-1">
                                             <div
-                                                className={`font-semibold shrink-0 ${
+                                                className={`font-semibold ${
                                                     m.hasKbResults
                                                         ? 'text-green-700 dark:text-green-400'
                                                         : 'text-amber-700 dark:text-amber-400'
