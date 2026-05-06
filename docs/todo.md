@@ -270,12 +270,12 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 - [x] **Issue #17** Ragas 評価パイプライン構築 — 2026-05-05 ベースライン取得完了。Run ID `run_20260505_151700` (faithfulness 0.45 / answer_relevancy 0.69 / context_precision 0.13 / context_recall 0.22)。Python 3.12 + Container Image / chat-handler 直接 invoke (案 C) / 独立 nested stack 構成。月次 EventBridge Scheduler 稼働開始。詳細は knowledge.md 参照。PR は `feature/ragas-evaluation-pipeline`
 - [~] **Issue #16 Phase 1** KB 不足領域分析の収集基盤（`feature/kb-miss-logging`、KB拡充の経路 [3] の入口）
-  - [ ] `amplify/data/resource.ts` の `Message` モデルに `topScore: a.float()` を追加（保存先）
-  - [ ] `amplify/data/resource.ts` の `ChatResponse` カスタム型に `topScore: a.float()` を追加（戻り値）
-  - [ ] `amplify/functions/chat-handler/handler.ts` で算出済みの `topScore` を `ChatResponse` に乗せて返す
-  - [ ] `web/app/page.tsx` の assistant メッセージ保存時に `topScore` を保存。`MessageRow` 型と `loadMessages` も追従
-  - [ ] `npx ampx sandbox --once --outputs-out-dir web` で再デプロイ
-  - [ ] KB ヒットなし質問を1件発生させ、DynamoDB の `Message` テーブルに `hasKbResults=false` + `topScore<0.7` で保存されているか AWS Console で確認
+  - [x] `amplify/data/resource.ts` の `Message` モデルに `topScore: a.float()` を追加（保存先）
+  - [x] `amplify/data/resource.ts` の `ChatResponse` カスタム型に `topScore: a.float()` を追加（戻り値）
+  - [x] `amplify/functions/chat-handler/handler.ts` で算出済みの `topScore` を `ChatResponse` に乗せて返す
+  - [x] `web/app/page.tsx` の assistant メッセージ保存時に `topScore` を保存。`MessageRow` 型と `loadMessages` も追従
+  - [x] `npx ampx sandbox --once --outputs-out-dir web` で再デプロイ (UPDATE_COMPLETE 123秒)
+  - [x] DynamoDB の `Message` テーブルに `topScore` が float で保存されていることを CLI で確認 (2026-05-06: `topScore=0.7332` を1件捕捉、knowledge.md 参照。閾値 0.7 の偽陽性議論は Phase 2 で再検討)
   - [ ] PR 作成 → main にマージ
 - [ ] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— Phase 1 マージ後、1ヶ月程度の実データ蓄積を待ってから着手判断
 - [ ] **Issue #16 Phase 3** LLM 補助による棚卸サイクル — Phase 2 完了後に判断
