@@ -58,6 +58,8 @@ interface ChatResponse {
     answer: string;
     citations: Citation[];
     hasKbResults: boolean;
+    // Issue #16 Phase 1: KB不足領域分析のため top-K の最大コサイン類似度を返す。
+    topScore: number;
 }
 
 interface AppSyncEvent {
@@ -297,5 +299,6 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
         answer: answerText,
         citations: hasResults ? citations : [],
         hasKbResults: hasResults,
+        topScore,
     };
 };
