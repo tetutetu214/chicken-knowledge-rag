@@ -4,16 +4,16 @@
 
 ## プロジェクト概要
 
-ペット鶏 150羽との暮らしを支援するRAGエージェント。
-家族2名 (うち1名はペット鶏 飼育3年経験者) が利用するプライベートシステム。
+100羽以上の鶏との暮らしを支援するRAGエージェント。
+家族のうち1名は鶏 飼育3年経験者で、家族のみが利用するプライベートシステム。
 鶏の生命と卵の食品安全の両面で命を扱う性質上、精度担保を最優先設計方針とする。
 
 対象範囲:
 - 飼養衛生管理 (家畜伝染病予防法上、100羽以上は届出対象)
-- 自作鶏小屋 (20m × 6m = 120m²、2026-06頃完成予定)
+- 自作鶏小屋 (建築中)
 - 害獣対策 (カラス/タヌキ/ハクビシン/イタチ。物理防御 → 忌避フェーズ)
-- AW・行動観察・日光浴などペットならではの飼育
-- 卵 約30個/日 = 11,000個/年 の活用 (保存・賞味期限・大量消費レシピ・食中毒予防)
+- AW・行動観察・日光浴などの飼育
+- 日々得られる卵の活用 (保存・賞味期限・大量消費レシピ・食中毒予防)
 
 詳細は `docs/spec.md`（要求定義書 v2.0）を参照すること。
 
@@ -35,7 +35,7 @@
 | Embedding | Titan Text Embeddings V2（1024次元 cosine） |
 | 回答生成LLM | Claude Sonnet 4.5（メイン）/ Claude Haiku 4.5（軽量質問用） |
 | 会話バックエンド | AWS Amplify Gen2 + AI Kit（`a.conversation()`） |
-| 認証 | Amazon Cognito User Pool（2名のみ） |
+| 認証 | Amazon Cognito User Pool（家族のみ） |
 | 会話履歴 | Amazon DynamoDB（Single Table Design・ULID・TTL 90日） |
 | バックエンドAPI | API Gateway + AWS Lambda（Python 3.12 / boto3） |
 | 自動Ingestion | Amazon EventBridge + Lambda |
@@ -52,7 +52,7 @@
 | S3 Vectors index | Bedrock KBが管理するベクトルインデックス |
 | Bedrock Knowledge Base | RAGオーケストレーション本体 |
 | DynamoDB（会話履歴） | PK=`user_{userId}`, SK=`CONV#{ulid}` または `CHAT#{convId}#MSG#{ulid}`、TTL 90日 |
-| Cognito User Pool | 家族2名のみ |
+| Cognito User Pool | 家族のみ |
 | Lambda（Conversation Handler） | Bedrock `retrieve_and_generate` を呼び出し |
 | Lambda（Knowledge POST） | Markdown投稿 → S3保存 |
 | EventBridge | S3 ObjectCreated → StartIngestionJob |
