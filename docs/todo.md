@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-06 (Issue #16 Phase 1 完了 — PR #27 で `Message.topScore` 保存基盤 + UI縦並び化をマージ。Phase 2/3 は1ヶ月程度の実データ蓄積後に着手判断)
+最終更新: 2026-05-07 (awsiac MCP + CDK ベストプラクティス照合のコードレビュー実施。改善方向を Issue #28〜#34 として 7 本起票、コード変更は次セッション以降。前回までの状態: Issue #16 Phase 1 完了、PR #27 で `Message.topScore` 保存基盤 + UI縦並び化をマージ済み)
 
 ### 次回セッション開始時にやること
 
@@ -22,16 +22,32 @@
 | **[2]** | 家族ナレッジ追加 | 会話駆動抽出 + 承認 UI | S3 knowledge-bucket → 自動 Ingestion | 家族 | Step 6, Issue #15 |
 | **[3]** | 不足領域分析 | KBミスヒット質問のログ | てつてつへの可視化レポート | システム | Step 7 一部, Issue #16 |
 
-### 現状の Open Issue 一覧 (2026-05-05 時点、優先度ラベル付与済み)
+### 現状の Open Issue 一覧 (2026-05-07 時点、優先度ラベル付与済み)
+
+#### 機能・運用系 (既存)
 
 | Priority | Issue | タイトル | 種別 | 紐づく Step |
 |---|---|---|---|---|
-| **P1** | **#16** | KB根拠なし質問のフィードバックループ | 実装、#17 ベースラインの cp=0 質問群を inputs に活用可 | Step 7 (経路 [3]) |
+| **P1** | **#16** | KB根拠なし質問のフィードバックループ (Phase 2 以降) | 実装、#17 ベースラインの cp=0 質問群を inputs に活用可 | Step 7 (経路 [3]) |
 | **P1** | **#21** | ユーザー不満の直接記録機能 (👎+自由記述) | 実装 | Step 7 |
 | **P2** | **#15** | ナレッジ投稿の品質ガード設計 | 設計議論 | Step 6 |
 | **P2** | **#20** | 既存KB 14本に sidecar metadata 付与 | 実装 | Step 7 |
 | **P3** | **#13** | 回答生成モデル動的切替機能 (Haiku/Sonnet) | 実装、軽い | 横断 (#22 とは別物、動的切替) |
 | **P3** | **#19** | 画像入力対応 (症状写真 → Vision LLM → KB) | 実装 | Phase 2 |
+
+#### コードレビュー由来 (2026-05-07 起票、awsiac MCP の cdk_best_practices に基づく足固め)
+
+| Priority | Issue | タイトル | 観点 | 関連ファイル |
+|---|---|---|---|---|
+| **P1** | **#28** | Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化 | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
+| **P1** | **#29** | DynamoDB `expiresAt` をバックエンドで強制計算 | 信頼性 | `functions/chat-handler/`, `functions/summarize-handler/` |
+| **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
+| **P2** | **#31** | 設定値の環境変数化 (SCORE_THRESHOLD / EMBEDDING_MODEL_ID / requireEnv ヘルパー) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
+| **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
+| **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 | 信頼性 | `infra/knowledge-base.ts`, 新規 `docs/operations.md` |
+| **P3** | **#34** | Amplify Hosting 環境変数展開フローを npm script に集約 | 保守性 | `package.json`, 新規 `scripts/pack-outputs.mjs` |
+
+着手順の推奨: #28 → #29 (P1 セキュリティ・信頼性を先に潰す) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
 直近 close 済 (履歴): **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
