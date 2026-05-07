@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
+import { MarkdownContent } from './MarkdownContent';
 
 const client = generateClient<Schema>();
 
@@ -479,8 +480,8 @@ export default function Home() {
                                         <div className="font-semibold text-blue-700 dark:text-blue-400">
                                             あなた:
                                         </div>
-                                        <div className="flex-1 whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
-                                            {m.content}
+                                        <div className="flex-1 text-zinc-900 dark:text-zinc-100">
+                                            <MarkdownContent content={m.content} />
                                         </div>
                                     </div>
                                 ) : (
@@ -497,8 +498,8 @@ export default function Home() {
                                                     ? '回答 (KB根拠あり):'
                                                     : '回答 (KB根拠なし):'}
                                             </div>
-                                            <div className="flex-1 whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
-                                                {m.content}
+                                            <div className="flex-1 text-zinc-800 dark:text-zinc-200">
+                                                <MarkdownContent content={m.content} />
                                             </div>
                                         </div>
                                         {m.citations.length > 0 && (
