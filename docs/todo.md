@@ -49,7 +49,7 @@
 
 着手順の推奨: #28 → #29 (P1 セキュリティ・信頼性を先に潰す) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
-直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
+直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定、目視 QA OK、Ragas Run `run_20260508_152801` faith 0.65 / ar 0.39 / cp 0.64 / cr 0.20 ※judge も Nova Pro のため self-eval bias 大、参考値扱い) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
 ### 命名ルール (2026-05-05 合意)
 
