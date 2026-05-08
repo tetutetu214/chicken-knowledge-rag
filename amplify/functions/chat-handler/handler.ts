@@ -27,6 +27,16 @@ import {
     RetrieveCommand,
 } from '@aws-sdk/client-bedrock-agent-runtime';
 
+// 環境変数を必須として読み出す。未設定なら Lambda 初期化時に即例外で失敗させ、
+// silently 0 や空文字で処理が進む事故を防ぐ (Issue #31)。
+const requireEnv = (name: string): string => {
+    const value = process.env[name];
+    if (!value) {
+        throw new Error(`環境変数 ${name} が未設定`);
+    }
+    return value;
+};
+
 const KB_ID = process.env.KNOWLEDGE_BASE_ID ?? '';
 const MODEL_ID = process.env.MODEL_ID ?? '';
 const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
@@ -35,8 +45,8 @@ const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 // S3 Vectors は閾値なしで top-K を必ず返すため、類似度が低い結果は
 // 「無関係な質問」として KB なし扱いに振り分ける必要がある。
 // 実測: 無関連質問「鶏の鳴き声を音楽にしたい」で top=0.66、関連質問で 0.87。
-// 中間値の 0.7 を閾値に設定。CloudWatch Logs を見て継続調整する。
-const SCORE_THRESHOLD = 0.7;
+// 中間値の 0.7 を初期値とし、CloudWatch Logs を見て env で調整する (Issue #31)。
+const SCORE_THRESHOLD = Number(requireEnv('SCORE_THRESHOLD'));
 
 const agentClient = new BedrockAgentRuntimeClient({ region: REGION });
 const runtimeClient = new BedrockRuntimeClient({ region: REGION });
