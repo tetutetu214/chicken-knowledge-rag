@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-07 (awsiac MCP + CDK ベストプラクティス照合のコードレビュー実施。改善方向を Issue #28〜#34 として 7 本起票、コード変更は次セッション以降。前回までの状態: Issue #16 Phase 1 完了、PR #27 で `Message.topScore` 保存基盤 + UI縦並び化をマージ済み)
+最終更新: 2026-05-08 (回答生成 / 履歴要約 / Ragas judge を Anthropic Claude Sonnet 4.6 → Amazon Nova Pro (APAC) に切替、Issue #31 の SCORE_THRESHOLD env 化を同梱。`feature/nova-pro-migration` で実装、PR 化前。前回: 2026-05-07 awsiac MCP + CDK ベストプラクティス照合のコードレビューで Issue #28〜#34 を 7 本起票)
 
 ### 次回セッション開始時にやること
 
@@ -42,14 +42,14 @@
 | **P1** | **#28** | Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化 | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
 | **P1** | **#29** | DynamoDB `expiresAt` をバックエンドで強制計算 | 信頼性 | `functions/chat-handler/`, `functions/summarize-handler/` |
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
-| **P2** | **#31** | 設定値の環境変数化 (SCORE_THRESHOLD / EMBEDDING_MODEL_ID / requireEnv ヘルパー) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
+| **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
 | **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
 | **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 | 信頼性 | `infra/knowledge-base.ts`, 新規 `docs/operations.md` |
 | **P3** | **#34** | Amplify Hosting 環境変数展開フローを npm script に集約 | 保守性 | `package.json`, 新規 `scripts/pack-outputs.mjs` |
 
 着手順の推奨: #28 → #29 (P1 セキュリティ・信頼性を先に潰す) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
-直近 close 済 (履歴): **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
+直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
 ### 命名ルール (2026-05-05 合意)
 
@@ -74,12 +74,12 @@
   - DataSource ID: AFSV7SCBAD
   - **AppSync GraphQL**: `amplify_outputs.json` の `data.url`（Cognito User Pool 認証必須）
     - `chat(question, historyJson, summary)` クエリ: Bedrock Retrieve + Converse、KB必須化、履歴・要約対応
-    - `summarize(existingSummary, messagesJson)` mutation: Haiku 4.5 で会話履歴を統合要約
+    - `summarize(existingSummary, messagesJson)` mutation: Nova Pro (APAC) で会話履歴を統合要約
     - `Conversation` モデル: title / summary / summarizedCount / expiresAt + messages (hasMany)、`allow.owner()` で所有者ガード
     - `Message` モデル: conversationId / role / content / citations(JSON) / hasKbResults / expiresAt、`allow.owner()`
   - **DynamoDB TTL**: Conversation / Message 両方に `expiresAt` 属性 (90日後の Unix epoch seconds) で TTL 有効化
   - **chat Lambda**: `amplify_outputs.json` の `custom.chatFunctionName` (TypeScript、Retrieve + Converse 統一構成)
-  - **summarize Lambda**: `amplify_outputs.json` の `custom.summarizeFunctionName` (Haiku 4.5 で要約)
+  - **summarize Lambda**: `amplify_outputs.json` の `custom.summarizeFunctionName` (Nova Pro APAC で要約)
   - **Cognito User Pool**: `amplify_outputs.json` の `auth.user_pool_id`（User1/User2 登録済み、CONFIRMED + 永続パスワード）
   - **Amplify Hosting App**: `amplify_outputs.json` の `custom.amplifyHostingAppId` / `amplifyHostingDefaultDomain`（CDK で IaC 化、GitHub PAT は Secrets Manager の `chicken-rag/github-token` を参照）
   - フロント: `web/` (Next.js 16 + Authenticator + サイドバーマルチスレッドUI + 要約自動呼出、`output: 'export'` で静的サイト化)
