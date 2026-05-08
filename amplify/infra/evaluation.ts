@@ -31,7 +31,7 @@ export interface EvaluationProps {
     chatHandlerFunctionName: string;
     /** chat-handler Lambda ARN (IAM 権限付与用) */
     chatHandlerFunctionArn: string;
-    /** ジャッジ LLM のモデル ID (例: global.anthropic.claude-sonnet-4-6) */
+    /** ジャッジ LLM のモデル ID (例: apac.amazon.nova-pro-v1:0) */
     modelId: string;
 }
 

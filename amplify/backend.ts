@@ -73,15 +73,14 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
     });
 
 // 会話 API: AppSync Direct Lambda Resolver (Cognito 認証必須)
-// 回答生成モデルは Global Inference Profile (Claude Sonnet 4.6、CRIS必須)。
-// JP より Global を選択した理由: 日本リージョン分のみだとピーク時に
-// 429 ThrottlingException リスクがあり、Global は複数リージョン分散でキャパ豊富。
+// 回答生成モデルは APAC Cross-region Inference Profile (Amazon Nova Pro、CRIS必須)。
+// 旧 Sonnet 4.6 (global) から Nova Pro へ切替 (AWSクレジット原資、Issue #22 系の継続)。
 const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
-const conversationModelId = 'global.anthropic.claude-sonnet-4-6';
+const conversationModelId = 'apac.amazon.nova-pro-v1:0';
 
 // Bedrock 呼び出し権限を Lambda 実行ロールに付与する共通ヘルパ。
-// chat / summarize 両方が Inference Profile 経由で Sonnet 4.6 を呼ぶため共有。
+// chat / summarize 両方が APAC Inference Profile 経由で Nova Pro を呼ぶため共有。
 const grantBedrockInvoke = (role: iam.IRole): void => {
     role.addToPrincipalPolicy(
         new iam.PolicyStatement({
@@ -110,6 +109,8 @@ chatLambda.addEnvironment(
     knowledgeBase.attrKnowledgeBaseId,
 );
 chatLambda.addEnvironment('MODEL_ID', conversationModelId);
+// KB ヒット判定の cosine 類似度閾値 (Issue #31、Lambda コンソールで運用調整可にする)。
+chatLambda.addEnvironment('SCORE_THRESHOLD', '0.7');
 
 const chatLambdaRole = chatLambda.role;
 if (!chatLambdaRole) {
