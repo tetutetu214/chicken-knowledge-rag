@@ -110,8 +110,10 @@ chatLambda.addEnvironment(
 );
 chatLambda.addEnvironment('MODEL_ID', conversationModelId);
 // KB ヒット判定の cosine 類似度閾値 (Issue #31、Lambda コンソールで運用調整可にする)。
-// 2026-05-09 に 0.7 → 0.75 へ引き上げ。0.71 で無関連質問が KB ヒット判定になり出典が表示される事例が出たため。
-chatLambda.addEnvironment('SCORE_THRESHOLD', '0.75');
+// 2026-05-09 朝に 0.7 → 0.75 へ引き上げ。同日夜、家族から「鶏の正式名称 (topScore 0.734) や首の骨の数 (0.622)
+// など KB に答えがある質問でも一般知識回答に振り分けられる」報告を受け 0.7 へ戻し。0.75 は L1 一般質問
+// (実測 0.63 帯) や日常語/専門語の語彙ギャップがあるクエリ (例「首の骨」vs「頚椎」) を取りこぼし過ぎる。
+chatLambda.addEnvironment('SCORE_THRESHOLD', '0.7');
 
 const chatLambdaRole = chatLambda.role;
 if (!chatLambdaRole) {
