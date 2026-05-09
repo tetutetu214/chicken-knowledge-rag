@@ -46,8 +46,11 @@ const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 // 「無関係な質問」として KB なし扱いに振り分ける必要がある。
 // 実測: 無関連質問「鶏の鳴き声を音楽にしたい」で top=0.71、関連質問 (L3 血便) で 0.76、
 // 一般質問 (L1 水替え) で 0.63。
-// 初期値 0.7 では 0.71 の無関連質問が KB ヒット扱いで出典が出る事例があったため、
-// 2026-05-09 に 0.75 へ引き上げ (env 値も backend.ts で同期更新)。Issue #31。
+// 2026-05-09 朝: 初期値 0.7 では 0.71 の無関連質問が KB ヒット扱いになる事例があり 0.75 へ引き上げ。
+// 2026-05-09 夜: 0.75 は L1 一般質問 (0.63 帯) や日常語/専門語の語彙ギャップがあるクエリ
+// (例「首の骨の数」topScore 0.622 / 文書側は「頚椎は14個」、「鶏の正式名称」topScore 0.734) を
+// 取りこぼすことが家族の利用ログから判明し、0.7 へ戻した。
+// 0.71 の偽陽性は別軸 (クエリ拡張・相対スコア・top1-top2 差) で対応する設計。Issue #31。
 const SCORE_THRESHOLD = Number(requireEnv('SCORE_THRESHOLD'));
 
 const agentClient = new BedrockAgentRuntimeClient({ region: REGION });
