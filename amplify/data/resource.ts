@@ -26,7 +26,7 @@ const schema = a.schema({
         citations: a.ref('Citation').array(),
         hasKbResults: a.boolean().required(),
         // KB Retrieve top-K のうち最大コサイン類似度。Issue #16 KB不足領域分析の入口。
-        // 0〜1.0、SCORE_THRESHOLD (0.7) 未満は KB根拠なし扱い。
+        // 0〜1.0、SCORE_THRESHOLD (0.75) 未満は KB根拠なし扱い。
         topScore: a.float(),
     }),
 
