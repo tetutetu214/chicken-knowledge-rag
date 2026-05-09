@@ -440,31 +440,34 @@ export default function Home() {
                             まだスレッドがありません
                         </p>
                     )}
-                    {/* アクティブスレッド (archived !== true)。アーカイブボタン (📥) のみ表示し、誤削除を防ぐ。 */}
+                    {/* アクティブスレッド (archived !== true)。
+                        タイトル部とボタンを兄弟要素にし、ボタン側のタップ判定を確実にする (親 div の onClick に巻き込まれない構造)。
+                        ボタンは min-w/h で 44x44 以上の最小タップ領域を確保。 */}
                     {threads
                         .filter((t) => !t.archived)
                         .map((t) => (
                             <div
                                 key={t.id}
-                                className={`group flex items-center justify-between gap-1 px-2 py-2 rounded cursor-pointer ${
+                                className={`flex items-center gap-1 rounded ${
                                     activeId === t.id
                                         ? 'bg-zinc-200 dark:bg-zinc-800'
                                         : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                 }`}
-                                onClick={() => {
-                                    setActiveId(t.id);
-                                    setSidebarOpen(false);
-                                }}
                             >
-                                <span className="text-sm text-zinc-800 dark:text-zinc-200 truncate flex-1">
-                                    {t.title}
-                                </span>
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        void setArchived(t.id, true);
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveId(t.id);
+                                        setSidebarOpen(false);
                                     }}
-                                    className="text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 px-1"
+                                    className="flex-1 text-left text-sm text-zinc-800 dark:text-zinc-200 truncate px-2 py-2"
+                                >
+                                    {t.title}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void setArchived(t.id, true)}
+                                    className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-zinc-500 hover:text-zinc-800 active:bg-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-100 dark:active:bg-zinc-600 rounded"
                                     title="アーカイブ"
                                     aria-label="アーカイブ"
                                 >
@@ -495,37 +498,36 @@ export default function Home() {
                                     .map((t) => (
                                         <div
                                             key={t.id}
-                                            className={`flex items-center justify-between gap-1 px-2 py-2 rounded cursor-pointer ${
+                                            className={`flex items-center gap-1 rounded ${
                                                 activeId === t.id
                                                     ? 'bg-zinc-200 dark:bg-zinc-800'
                                                     : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                             }`}
-                                            onClick={() => {
-                                                setActiveId(t.id);
-                                                setSidebarOpen(false);
-                                            }}
                                         >
-                                            <span className="text-sm text-zinc-500 dark:text-zinc-400 truncate flex-1">
-                                                {t.title}
-                                            </span>
-                                            {/* アーカイブ行: 復元 (↩) + 完全削除 (✕) */}
                                             <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    void setArchived(t.id, false);
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveId(t.id);
+                                                    setSidebarOpen(false);
                                                 }}
-                                                className="text-xs text-blue-500 hover:text-blue-700 px-1"
+                                                className="flex-1 text-left text-sm text-zinc-500 dark:text-zinc-400 truncate px-2 py-2"
+                                            >
+                                                {t.title}
+                                            </button>
+                                            {/* アーカイブ行: 復元 (↩) + 完全削除 (✕)。タップ領域 44x44 以上確保 */}
+                                            <button
+                                                type="button"
+                                                onClick={() => void setArchived(t.id, false)}
+                                                className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-blue-500 hover:text-blue-700 active:bg-blue-100 dark:active:bg-blue-900/30 rounded"
                                                 title="アクティブに戻す"
                                                 aria-label="復元"
                                             >
                                                 ↩
                                             </button>
                                             <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    void deleteThread(t.id);
-                                                }}
-                                                className="text-xs text-red-500 hover:text-red-700 px-1"
+                                                type="button"
+                                                onClick={() => void deleteThread(t.id)}
+                                                className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-red-500 hover:text-red-700 active:bg-red-100 dark:active:bg-red-900/30 rounded"
                                                 title="完全に削除"
                                                 aria-label="削除"
                                             >
