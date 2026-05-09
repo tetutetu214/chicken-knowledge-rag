@@ -297,6 +297,7 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [ ] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— Phase 1 マージ後、1ヶ月程度の実データ蓄積を待ってから着手判断
 - [ ] **Issue #16 Phase 3** LLM 補助による棚卸サイクル — Phase 2 完了後に判断
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
+- [x] **ペルソナ「コケ語尾」緩和** (家族フィードバック「毎回コケつけすぎて読みにくい」対応。全文必須 → 全体で1〜2回・自然な位置のみに変更、定型文4箇所のコケも撤去。fix/persona-koke-frequency、2026-05-09)
 - [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
 - [ ] **Issue #21** ユーザー不満の直接記録機能 (メッセージ単位の👎+自由記述、#16 と並行収集)
 - [x] **Issue #22** chat-handler / summarize-handler を Sonnet 4.6 Global に切替 (PR #23 で完了、2026-05-05、#18 の前提)
