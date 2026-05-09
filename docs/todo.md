@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-08 (回答生成 / 履歴要約 / Ragas judge を Anthropic Claude Sonnet 4.6 → Amazon Nova Pro (APAC) に切替、Issue #31 の SCORE_THRESHOLD env 化を同梱。`feature/nova-pro-migration` で実装、PR 化前。前回: 2026-05-07 awsiac MCP + CDK ベストプラクティス照合のコードレビューで Issue #28〜#34 を 7 本起票)
+最終更新: 2026-05-09 (スレッドのアーカイブ機能を追加。`Conversation.archived: a.boolean()` を新設し、サイドバーをアクティブ／折りたたみアーカイブの 2 区画 UI に変更。`feature/archive-threads` で実装、Amplify サンドボックス再デプロイと PR 作成は次手番。前回: 2026-05-08 Nova Pro 移行 + SCORE_THRESHOLD env 化)
 
 ### 次回セッション開始時にやること
 
