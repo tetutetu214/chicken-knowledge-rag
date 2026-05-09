@@ -110,7 +110,8 @@ chatLambda.addEnvironment(
 );
 chatLambda.addEnvironment('MODEL_ID', conversationModelId);
 // KB ヒット判定の cosine 類似度閾値 (Issue #31、Lambda コンソールで運用調整可にする)。
-chatLambda.addEnvironment('SCORE_THRESHOLD', '0.7');
+// 2026-05-09 に 0.7 → 0.75 へ引き上げ。0.71 で無関連質問が KB ヒット判定になり出典が表示される事例が出たため。
+chatLambda.addEnvironment('SCORE_THRESHOLD', '0.75');
 
 const chatLambdaRole = chatLambda.role;
 if (!chatLambdaRole) {
