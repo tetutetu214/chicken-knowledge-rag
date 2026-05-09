@@ -44,6 +44,10 @@ const schema = a.schema({
             summarizedCount: a.integer(),
             // DynamoDB TTL 属性 (Unix epoch seconds)。CDK escape hatch で TimeToLive を有効化する。
             expiresAt: a.integer(),
+            // アーカイブ済みフラグ。true ならサイドバー下段の折りたたみセクションに表示。
+            // 既存レコードは undefined のまま放置し、フロントで `archived !== true` をアクティブ扱いとする
+            // (DynamoDB スキーマレス特性を活用、移行スクリプト不要)。
+            archived: a.boolean(),
             messages: a.hasMany('Message', 'conversationId'),
         })
         .authorization((allow) => [allow.owner()]),

@@ -36,6 +36,7 @@ interface ThreadRow {
     title: string;
     summary: string;
     summarizedCount: number;
+    archived: boolean;
     updatedAt: string;
 }
 
@@ -71,6 +72,8 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     // スマホ用: 左ペイン (サイドバー) の表示・非表示。PC (md以上) では常に表示。
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    // アーカイブセクションの開閉状態。デフォルトは閉じる。
+    const [archivedOpen, setArchivedOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const showError = (label: string, e: unknown) => {
@@ -95,6 +98,8 @@ export default function Home() {
                     title: d.title,
                     summary: d.summary ?? '',
                     summarizedCount: d.summarizedCount ?? 0,
+                    // archived は新フィールド。null/undefined の既存レコードは false 扱い (アクティブ)。
+                    archived: d.archived === true,
                     updatedAt: d.updatedAt,
                 }))
                 .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -171,8 +176,29 @@ export default function Home() {
         }
     };
 
+    const setArchived = async (id: string, archived: boolean) => {
+        try {
+            // archived 部分更新のみ。AppSync の owner ガードが他人のスレッド更新を弾く。
+            const { errors } = await client.models.Conversation.update({
+                id,
+                archived,
+            });
+            if (errors && errors.length > 0) {
+                throw new Error(
+                    errors.map((er) => er.message).join(' / '),
+                );
+            }
+            // アーカイブで現在表示中スレッドを下段に押し込んだ場合は選択解除
+            if (archived && activeId === id) setActiveId(null);
+            await loadThreads();
+            setError(null);
+        } catch (e) {
+            showError(archived ? 'アーカイブ失敗' : '復元失敗', e);
+        }
+    };
+
     const deleteThread = async (id: string) => {
-        if (!window.confirm('このスレッドを削除しますか?')) return;
+        if (!window.confirm('このスレッドを完全に削除しますか? (元に戻せません)')) return;
         try {
             // Amplify Data はリレーションの cascading delete をサポートしないため、
             // 紐付く Message を全件取得 → 個別削除 → Conversation 削除の順で行う。
@@ -414,34 +440,101 @@ export default function Home() {
                             まだスレッドがありません
                         </p>
                     )}
-                    {threads.map((t) => (
-                        <div
-                            key={t.id}
-                            className={`group flex items-center justify-between gap-1 px-2 py-2 rounded cursor-pointer ${
-                                activeId === t.id
-                                    ? 'bg-zinc-200 dark:bg-zinc-800'
-                                    : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                            }`}
-                            onClick={() => {
-                                setActiveId(t.id);
-                                setSidebarOpen(false);
-                            }}
-                        >
-                            <span className="text-sm text-zinc-800 dark:text-zinc-200 truncate flex-1">
-                                {t.title}
-                            </span>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    void deleteThread(t.id);
+                    {/* アクティブスレッド (archived !== true)。アーカイブボタン (📥) のみ表示し、誤削除を防ぐ。 */}
+                    {threads
+                        .filter((t) => !t.archived)
+                        .map((t) => (
+                            <div
+                                key={t.id}
+                                className={`group flex items-center justify-between gap-1 px-2 py-2 rounded cursor-pointer ${
+                                    activeId === t.id
+                                        ? 'bg-zinc-200 dark:bg-zinc-800'
+                                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                }`}
+                                onClick={() => {
+                                    setActiveId(t.id);
+                                    setSidebarOpen(false);
                                 }}
-                                className="opacity-0 group-hover:opacity-100 text-xs text-red-500 hover:text-red-700 px-1"
-                                title="削除"
                             >
-                                ✕
+                                <span className="text-sm text-zinc-800 dark:text-zinc-200 truncate flex-1">
+                                    {t.title}
+                                </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        void setArchived(t.id, true);
+                                    }}
+                                    className="text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 px-1"
+                                    title="アーカイブ"
+                                    aria-label="アーカイブ"
+                                >
+                                    📥
+                                </button>
+                            </div>
+                        ))}
+
+                    {/* アーカイブセクション (折りたたみ)。件数バッジ付きヘッダーで開閉。 */}
+                    {threads.some((t) => t.archived) && (
+                        <div className="mt-3 border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setArchivedOpen((v) => !v)}
+                                className="w-full flex items-center justify-between px-2 py-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                aria-expanded={archivedOpen}
+                            >
+                                <span>
+                                    📦 アーカイブ済み (
+                                    {threads.filter((t) => t.archived).length}
+                                    )
+                                </span>
+                                <span>{archivedOpen ? '▾' : '▸'}</span>
                             </button>
+                            {archivedOpen
+                                && threads
+                                    .filter((t) => t.archived)
+                                    .map((t) => (
+                                        <div
+                                            key={t.id}
+                                            className={`flex items-center justify-between gap-1 px-2 py-2 rounded cursor-pointer ${
+                                                activeId === t.id
+                                                    ? 'bg-zinc-200 dark:bg-zinc-800'
+                                                    : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                            }`}
+                                            onClick={() => {
+                                                setActiveId(t.id);
+                                                setSidebarOpen(false);
+                                            }}
+                                        >
+                                            <span className="text-sm text-zinc-500 dark:text-zinc-400 truncate flex-1">
+                                                {t.title}
+                                            </span>
+                                            {/* アーカイブ行: 復元 (↩) + 完全削除 (✕) */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void setArchived(t.id, false);
+                                                }}
+                                                className="text-xs text-blue-500 hover:text-blue-700 px-1"
+                                                title="アクティブに戻す"
+                                                aria-label="復元"
+                                            >
+                                                ↩
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void deleteThread(t.id);
+                                                }}
+                                                className="text-xs text-red-500 hover:text-red-700 px-1"
+                                                title="完全に削除"
+                                                aria-label="削除"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
                         </div>
-                    ))}
+                    )}
                 </div>
                 <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
                     <div className="truncate mb-1">
