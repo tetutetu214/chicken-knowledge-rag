@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-09 (スレッドのアーカイブ機能を追加。`Conversation.archived: a.boolean()` を新設し、サイドバーをアクティブ／折りたたみアーカイブの 2 区画 UI に変更。`feature/archive-threads` で実装、Amplify サンドボックス再デプロイと PR 作成は次手番。前回: 2026-05-08 Nova Pro 移行 + SCORE_THRESHOLD env 化)
+最終更新: 2026-05-10 (家族体験のフィードバック2件に対応中。(1) `feature/archive-revamp` でアーカイブを「90日後自動削除のゴミ箱」モデルに作り変え (アクティブ TTL 撤廃 + アーカイブ時に expiresAt 上書き + UI を常時表示の独立セクション化)。(2) `feature/query-expansion-issue-31` (PR1 マージ後着手) で Issue #31 の RAG クエリ拡張に着手予定。前回: 2026-05-09 アーカイブ機能 (折りたたみ版) を追加)
 
 ### 次回セッション開始時にやること
 
@@ -42,7 +42,7 @@
 | **P1** | **#28** | Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化 | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
 | **P1** | **#29** | DynamoDB `expiresAt` をバックエンドで強制計算 | 信頼性 | `functions/chat-handler/`, `functions/summarize-handler/` |
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
-| **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
+| **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残)。**派生**: 0.62〜0.69 帯の語彙ギャップで取りこぼす質問への根本対応として Nova Pro による同義語クエリ拡張を `feature/query-expansion-issue-31` で別 PR 化予定 (2026-05-10) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
 | **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
 | **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 | 信頼性 | `infra/knowledge-base.ts`, 新規 `docs/operations.md` |
 | **P3** | **#34** | Amplify Hosting 環境変数展開フローを npm script に集約 | 保守性 | `package.json`, 新規 `scripts/pack-outputs.mjs` |
@@ -300,6 +300,18 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] **ペルソナ「コケ語尾」緩和** (家族フィードバック「毎回コケつけすぎて読みにくい」対応。全文必須 → 全体で1〜2回・自然な位置のみに変更、定型文4箇所のコケも撤去。PR #38、2026-05-09)
 - [x] **persona 指示の精緻化と KB 閾値 0.7→0.75** (動作確認で「コケが単独行に出る」「無関連質問が閾値ギリギリで誤ヒット」を発見し追加対応。fix/koke-natural-and-threshold-075、2026-05-09)
 - [x] **KB 閾値 0.75→0.7 戻し** (家族利用ログで「鶏の正式名称」topScore 0.734 / 「首の骨の数」topScore 0.622 が KB 未ヒット扱いになる事象を確認。0.734 帯は閾値戻しで救済、0.622 帯は語彙ギャップ問題として別軸対策に持ち越し。fix/score-threshold-revert-070、2026-05-09 PM)
+- [~] **アーカイブを「90日後自動削除のゴミ箱」モデルに変更** (2026-05-10、`feature/archive-revamp`)
+  - [ ] `web/app/page.tsx`: `createThread()` / `send()` / `Message.create` の `expiresAt: ttlSeconds()` を撤去 (アクティブは TTL 対象外)
+  - [ ] `setArchived(id, true)` で Conversation + 紐付く全 Message の `expiresAt` を `now + 90日(秒)` に上書き
+  - [ ] `setArchived(id, false)` (復元) で `expiresAt = null` に戻す
+  - [ ] アーカイブ UI を折りたたみから「📥 アーカイブ（90日後に自動削除）」固定ヘッダー + 常時表示に変更、各行に「あと N 日で削除」表示
+  - [ ] アクティブ行 📥 タップ時に確認ダイアログ追加 (誤タップ対策)
+  - [ ] PR 作成 → main マージ
+- [ ] **Issue #31 RAG クエリ拡張 (`feature/query-expansion-issue-31`)** (PR1 マージ後着手、2026-05-10 起案)
+  - [ ] `chat-handler.ts` に Nova Pro 同義語展開ステップ追加 (例: 「首の骨」→「首の骨, 頚椎, 頸椎」)
+  - [ ] 各拡張クエリで Retrieve → スコアマージで上位5件採用
+  - [ ] CloudWatch ログに「展開後クエリ」「拡張前後の topScore 比較」を出力
+  - [ ] Ragas で拡張あり/なしを A/B 比較し faithfulness と context_recall の改善幅を測る
 - [ ] **Issue #20** 既存KB 14本のドキュメントに sidecar metadata を付与 (source_type / category / issuer / issued_date)
 - [ ] **Issue #21** ユーザー不満の直接記録機能 (メッセージ単位の👎+自由記述、#16 と並行収集)
 - [x] **Issue #22** chat-handler / summarize-handler を Sonnet 4.6 Global に切替 (PR #23 で完了、2026-05-05、#18 の前提)
