@@ -252,7 +252,7 @@ export default function Home() {
             await loadThreads();
             setError(null);
         } catch (e) {
-            showError(archived ? 'アーカイブ失敗' : '復元失敗', e);
+            showError(archived ? 'ゴミ箱送り失敗' : '復元失敗', e);
         }
     };
 
@@ -527,20 +527,20 @@ export default function Home() {
                                     type="button"
                                     onClick={() => {
                                         // 2026-05-10: 誤タップで会話が「消えた」と感じさせないよう、
-                                        // アーカイブ操作は確認ダイアログで明示同意を取る (家族からの「わけわからん」対策)。
+                                        // ゴミ箱送り操作は確認ダイアログで明示同意を取る (家族からの「わけわからん」対策)。
                                         if (
                                             window.confirm(
-                                                `「${t.title}」をアーカイブに移動します。\n90日後に自動で削除されます。\n（左ペイン下の「📥 アーカイブ」から復元・即時削除も可能です）`,
+                                                `「${t.title}」をゴミ箱に移動します。\n90日後に自動で削除されます。\n（左ペイン下の「🗑 ゴミ箱」から復元・即時削除も可能です）`,
                                             )
                                         ) {
                                             void setArchived(t.id, true);
                                         }
                                     }}
                                     className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-zinc-500 hover:text-zinc-800 active:bg-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-100 dark:active:bg-zinc-600 rounded"
-                                    title="アーカイブへ移動 (90日後に自動削除)"
-                                    aria-label="アーカイブへ移動"
+                                    title="ゴミ箱へ移動 (90日後に自動削除)"
+                                    aria-label="ゴミ箱へ移動"
                                 >
-                                    📥
+                                    📦
                                 </button>
                             </div>
                         ))}
@@ -549,11 +549,13 @@ export default function Home() {
                 {/* 2026-05-10: アーカイブセクションを「常時表示の独立エリア」に変更。
                     家族から「📥 を押したら消えた／残った／分からない」のフィードバックを受け、
                     折りたたみ式 → 固定ヘッダー＋常時表示リストに作り直し。
-                    各行に「あと N 日で削除」を表示してゴミ箱モデルを視覚的に明示する。 */}
-                <div className="border-t border-zinc-200 dark:border-zinc-800">
-                    <div className="px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/60 flex items-center justify-between">
-                        <span>📥 アーカイブ（90日後に自動削除）</span>
-                        <span className="text-zinc-500 dark:text-zinc-500">
+                    各行に「あと N 日で削除」を表示してゴミ箱モデルを視覚的に明示する。
+                    2026-05-11: UI ラベルを「アーカイブ」→「ゴミ箱」に統一し、ヘッダー背景を amber に変更して
+                    アクティブ領域との境界を視覚的に強調 (家族から「アイコンの意味が分からない」フィードバック対応)。 */}
+                <div className="border-t-2 border-amber-300 dark:border-amber-700/50">
+                    <div className="px-3 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/30 flex items-center justify-between">
+                        <span>🗑 ゴミ箱（90日後に自動削除）</span>
+                        <span className="text-amber-700 dark:text-amber-300">
                             {threads.filter((t) => t.archived).length}件
                         </span>
                     </div>
