@@ -10,10 +10,18 @@ const client = generateClient<Schema>();
 
 // LLM に渡す履歴件数の上限。これを超えた古い履歴は summary に統合する。
 const HISTORY_LIMIT = 10;
-// DynamoDB TTL: 90日後の Unix epoch seconds を返す。
-const TTL_DAYS = 90;
-const ttlSeconds = (): number =>
-    Math.floor(Date.now() / 1000) + TTL_DAYS * 86400;
+// DynamoDB TTL: アーカイブ操作時刻からの「ゴミ箱」期間。
+// アクティブ会話は expiresAt = null で TTL 対象外、アーカイブ時に now + 90日(秒) を上書きする
+// (2026-05-10 仕様変更、knowledge.md 参照)。Unix epoch は「秒」必須なので Math.floor で潰す。
+const ARCHIVE_TTL_DAYS = 90;
+const archiveExpiresAt = (): number =>
+    Math.floor(Date.now() / 1000) + ARCHIVE_TTL_DAYS * 86400;
+// アーカイブ済み行に「あと N 日で削除」を出すための残日数計算。負の値は 0 に丸める。
+const remainingDaysUntilDelete = (expiresAt: number | null): number | null => {
+    if (expiresAt == null) return null;
+    const seconds = expiresAt - Math.floor(Date.now() / 1000);
+    return seconds <= 0 ? 0 : Math.ceil(seconds / 86400);
+};
 
 interface Citation {
     uri: string;
@@ -37,6 +45,8 @@ interface ThreadRow {
     summary: string;
     summarizedCount: number;
     archived: boolean;
+    // アーカイブ済み行で残り削除日数を表示するために保持。アクティブ行では null。
+    expiresAt: number | null;
     updatedAt: string;
 }
 
@@ -72,8 +82,6 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     // スマホ用: 左ペイン (サイドバー) の表示・非表示。PC (md以上) では常に表示。
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    // アーカイブセクションの開閉状態。デフォルトは閉じる。
-    const [archivedOpen, setArchivedOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const showError = (label: string, e: unknown) => {
@@ -100,11 +108,43 @@ export default function Home() {
                     summarizedCount: d.summarizedCount ?? 0,
                     // archived は新フィールド。null/undefined の既存レコードは false 扱い (アクティブ)。
                     archived: d.archived === true,
+                    expiresAt: d.expiresAt ?? null,
                     updatedAt: d.updatedAt,
                 }))
                 .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
             setThreads(rows);
             setError(null);
+
+            // 2026-05-10: 旧仕様 (作成時 expiresAt = now + 90日) で作られたアクティブ会話は、
+            // 放っておくと TTL で勝手に消えてしまうため null 化する移行処理。
+            // 該当レコードが残っている初回ログイン時のみ走り、以降は何もしない (DynamoDB write 余計に発生しない)。
+            // 紐付く Message の expiresAt も同様に null 化する (親子整合性)。
+            const orphans = rows.filter((r) => !r.archived && r.expiresAt != null);
+            if (orphans.length > 0) {
+                console.info(
+                    `[migrate] ${orphans.length} 件のアクティブ会話を TTL 対象外に変更`,
+                );
+                await Promise.all(
+                    orphans.map(async (o) => {
+                        await client.models.Conversation.update({
+                            id: o.id,
+                            expiresAt: null,
+                        });
+                        const { data: msgs } = await client.models.Message.list({
+                            filter: { conversationId: { eq: o.id } },
+                            limit: 1000,
+                        });
+                        await Promise.all(
+                            (msgs ?? []).map((m) =>
+                                client.models.Message.update({
+                                    id: m.id,
+                                    expiresAt: null,
+                                }),
+                            ),
+                        );
+                    }),
+                );
+            }
         } catch (e) {
             showError('スレッド一覧取得失敗', e);
         }
@@ -157,10 +197,11 @@ export default function Home() {
 
     const createThread = async () => {
         try {
+            // 2026-05-10: アクティブ会話は TTL 対象外にする (knowledge.md 参照)。
+            // expiresAt はアーカイブ操作時に now + 90日(秒) で上書きする運用に変更。
             const { data, errors } = await client.models.Conversation.create({
                 title: '新しい会話',
                 summarizedCount: 0,
-                expiresAt: ttlSeconds(),
             });
             if (errors && errors.length > 0) {
                 throw new Error(
@@ -178,22 +219,40 @@ export default function Home() {
 
     const setArchived = async (id: string, archived: boolean) => {
         try {
-            // archived 部分更新のみ。AppSync の owner ガードが他人のスレッド更新を弾く。
+            // 2026-05-10: アーカイブを「90日後自動削除のゴミ箱」モデルに変更。
+            // archived=true 時は expiresAt を now + 90日(秒) に上書きし、紐付く全 Message の
+            // expiresAt も同じ値に揃える (DynamoDB TTL 最大48時間ラグで親子整合性が崩れるのを防ぐ)。
+            // archived=false (復元) 時は expiresAt = null に戻して TTL 対象から外す。
+            const expiresAt = archived ? archiveExpiresAt() : null;
+
             const { errors } = await client.models.Conversation.update({
                 id,
                 archived,
+                expiresAt,
             });
             if (errors && errors.length > 0) {
                 throw new Error(
                     errors.map((er) => er.message).join(' / '),
                 );
             }
+
+            // 紐付く Message を取得して expiresAt を一括同期。家族規模 (1スレッド数十件) を想定。
+            const { data: msgs } = await client.models.Message.list({
+                filter: { conversationId: { eq: id } },
+                limit: 1000,
+            });
+            await Promise.all(
+                (msgs ?? []).map((m) =>
+                    client.models.Message.update({ id: m.id, expiresAt }),
+                ),
+            );
+
             // アーカイブで現在表示中スレッドを下段に押し込んだ場合は選択解除
             if (archived && activeId === id) setActiveId(null);
             await loadThreads();
             setError(null);
         } catch (e) {
-            showError(archived ? 'アーカイブ失敗' : '復元失敗', e);
+            showError(archived ? 'ゴミ箱送り失敗' : '復元失敗', e);
         }
     };
 
@@ -278,12 +337,12 @@ export default function Home() {
             let isFirstMessage = false;
 
             if (!convId) {
-                // スレッド未選択時は新規作成し、タイトルは質問の冒頭40文字
+                // スレッド未選択時は新規作成し、タイトルは質問の冒頭40文字。
+                // 2026-05-10: expiresAt は設定しない (アクティブは TTL 対象外、アーカイブ時に上書き)。
                 const { data: created, errors: createErrs } =
                     await client.models.Conversation.create({
                         title: text.slice(0, 40),
                         summarizedCount: 0,
-                        expiresAt: ttlSeconds(),
                     });
                 if (createErrs && createErrs.length > 0) {
                     throw new Error(
@@ -321,14 +380,15 @@ export default function Home() {
                 recent.map((m) => ({ role: m.role, content: m.content })),
             );
 
-            // user メッセージ保存
+            // user メッセージ保存。
+            // 2026-05-10: expiresAt は設定しない (アクティブ会話に紐付く Message は TTL 対象外、
+            // 親 Conversation がアーカイブされた際にまとめて expiresAt 上書きされる)。
             const { errors: userMsgErrs } =
                 await client.models.Message.create({
                     conversationId: convId,
                     role: 'user',
                     content: text,
                     hasKbResults: false,
-                    expiresAt: ttlSeconds(),
                 });
             if (userMsgErrs && userMsgErrs.length > 0) {
                 throw new Error(
@@ -357,7 +417,7 @@ export default function Home() {
                 ),
             );
 
-            // assistant メッセージ保存
+            // assistant メッセージ保存。expiresAt は user メッセージと同じ理由で未設定。
             const { errors: asstMsgErrs } =
                 await client.models.Message.create({
                     conversationId: convId,
@@ -366,7 +426,6 @@ export default function Home() {
                     citations: citationsForSave,
                     hasKbResults: resp.hasKbResults ?? false,
                     topScore: resp.topScore ?? null,
-                    expiresAt: ttlSeconds(),
                 });
             if (asstMsgErrs && asstMsgErrs.length > 0) {
                 throw new Error(
@@ -466,77 +525,97 @@ export default function Home() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => void setArchived(t.id, true)}
+                                    onClick={() => {
+                                        // 2026-05-10: 誤タップで会話が「消えた」と感じさせないよう、
+                                        // ゴミ箱送り操作は確認ダイアログで明示同意を取る (家族からの「わけわからん」対策)。
+                                        if (
+                                            window.confirm(
+                                                `「${t.title}」をゴミ箱に移動します。\n90日後に自動で削除されます。\n（左ペイン下の「🗑 ゴミ箱」から復元・即時削除も可能です）`,
+                                            )
+                                        ) {
+                                            void setArchived(t.id, true);
+                                        }
+                                    }}
                                     className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-zinc-500 hover:text-zinc-800 active:bg-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-100 dark:active:bg-zinc-600 rounded"
-                                    title="アーカイブ"
-                                    aria-label="アーカイブ"
+                                    title="ゴミ箱へ移動 (90日後に自動削除)"
+                                    aria-label="ゴミ箱へ移動"
                                 >
-                                    📥
+                                    📦
                                 </button>
                             </div>
                         ))}
+                </div>
 
-                    {/* アーカイブセクション (折りたたみ)。件数バッジ付きヘッダーで開閉。 */}
-                    {threads.some((t) => t.archived) && (
-                        <div className="mt-3 border-t border-zinc-200 dark:border-zinc-800 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => setArchivedOpen((v) => !v)}
-                                className="w-full flex items-center justify-between px-2 py-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                                aria-expanded={archivedOpen}
-                            >
-                                <span>
-                                    📦 アーカイブ済み (
-                                    {threads.filter((t) => t.archived).length}
-                                    )
-                                </span>
-                                <span>{archivedOpen ? '▾' : '▸'}</span>
-                            </button>
-                            {archivedOpen
-                                && threads
-                                    .filter((t) => t.archived)
-                                    .map((t) => (
-                                        <div
-                                            key={t.id}
-                                            className={`flex items-center gap-1 rounded ${
-                                                activeId === t.id
-                                                    ? 'bg-zinc-200 dark:bg-zinc-800'
-                                                    : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                            }`}
+                {/* 2026-05-10: アーカイブセクションを「常時表示の独立エリア」に変更。
+                    家族から「📥 を押したら消えた／残った／分からない」のフィードバックを受け、
+                    折りたたみ式 → 固定ヘッダー＋常時表示リストに作り直し。
+                    各行に「あと N 日で削除」を表示してゴミ箱モデルを視覚的に明示する。
+                    2026-05-11: UI ラベルを「アーカイブ」→「ゴミ箱」に統一し、ヘッダー背景を amber に変更して
+                    アクティブ領域との境界を視覚的に強調 (家族から「アイコンの意味が分からない」フィードバック対応)。 */}
+                <div className="border-t-2 border-amber-300 dark:border-amber-700/50">
+                    <div className="px-3 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/30 flex items-center justify-between">
+                        <span>🗑 ゴミ箱（90日後に自動削除）</span>
+                        <span className="text-amber-700 dark:text-amber-300">
+                            {threads.filter((t) => t.archived).length}件
+                        </span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto px-2 pt-1 pb-2">
+                        {threads.filter((t) => t.archived).length === 0 && (
+                            <p className="px-2 py-2 text-xs text-zinc-500 dark:text-zinc-500">
+                                ここに送ったスレッドは90日後に消えます
+                            </p>
+                        )}
+                        {threads
+                            .filter((t) => t.archived)
+                            .map((t) => {
+                                const remaining = remainingDaysUntilDelete(t.expiresAt);
+                                return (
+                                    <div
+                                        key={t.id}
+                                        className={`flex items-center gap-1 rounded ${
+                                            activeId === t.id
+                                                ? 'bg-zinc-200 dark:bg-zinc-800'
+                                                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveId(t.id);
+                                                setSidebarOpen(false);
+                                            }}
+                                            className="flex-1 text-left text-sm text-zinc-500 dark:text-zinc-400 truncate px-2 py-2"
                                         >
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveId(t.id);
-                                                    setSidebarOpen(false);
-                                                }}
-                                                className="flex-1 text-left text-sm text-zinc-500 dark:text-zinc-400 truncate px-2 py-2"
-                                            >
-                                                {t.title}
-                                            </button>
-                                            {/* アーカイブ行: 復元 (↩) + 完全削除 (✕)。タップ領域 44x44 以上確保 */}
-                                            <button
-                                                type="button"
-                                                onClick={() => void setArchived(t.id, false)}
-                                                className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-blue-500 hover:text-blue-700 active:bg-blue-100 dark:active:bg-blue-900/30 rounded"
-                                                title="アクティブに戻す"
-                                                aria-label="復元"
-                                            >
-                                                ↩
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => void deleteThread(t.id)}
-                                                className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-red-500 hover:text-red-700 active:bg-red-100 dark:active:bg-red-900/30 rounded"
-                                                title="完全に削除"
-                                                aria-label="削除"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                        </div>
-                    )}
+                                            <span className="block truncate">{t.title}</span>
+                                            <span className="block text-[10px] text-zinc-400 dark:text-zinc-500">
+                                                {remaining != null
+                                                    ? `あと ${remaining} 日で削除`
+                                                    : '削除予定日 未設定'}
+                                            </span>
+                                        </button>
+                                        {/* アーカイブ行: 復元 (↩) + 完全削除 (✕)。タップ領域 44x44 以上確保 */}
+                                        <button
+                                            type="button"
+                                            onClick={() => void setArchived(t.id, false)}
+                                            className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-blue-500 hover:text-blue-700 active:bg-blue-100 dark:active:bg-blue-900/30 rounded"
+                                            title="アクティブに戻す"
+                                            aria-label="復元"
+                                        >
+                                            ↩
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => void deleteThread(t.id)}
+                                            className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-base text-red-500 hover:text-red-700 active:bg-red-100 dark:active:bg-red-900/30 rounded"
+                                            title="今すぐ完全に削除"
+                                            aria-label="今すぐ削除"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                    </div>
                 </div>
                 <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
                     <div className="truncate mb-1">
