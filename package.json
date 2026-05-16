@@ -7,7 +7,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sandbox": "npx ampx sandbox --once --outputs-out-dir web && node scripts/sync-outputs-env.mjs",
+    "sandbox:full": "npm run sandbox && source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once --outputs-out-dir web"
   },
   "keywords": [],
   "author": "",
