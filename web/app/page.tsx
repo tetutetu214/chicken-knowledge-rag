@@ -5,28 +5,20 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
 import { MarkdownContent } from './MarkdownContent';
+import { type Citation, parseCitations } from '../lib/citations';
+import { archiveExpiresAt, remainingDaysUntilDelete } from '../lib/ttl';
+import {
+    type ThreadRow,
+    findOrphanActiveThreads,
+    sortByUpdatedAtDesc,
+    toThreadRow,
+} from '../lib/threads';
+import { CONVERSATION_FIELDS, MESSAGE_FIELDS } from '../lib/selectionSets';
 
 const client = generateClient<Schema>();
 
 // LLM に渡す履歴件数の上限。これを超えた古い履歴は summary に統合する。
 const HISTORY_LIMIT = 10;
-// DynamoDB TTL: アーカイブ操作時刻からの「ゴミ箱」期間。
-// アクティブ会話は expiresAt = null で TTL 対象外、アーカイブ時に now + 90日(秒) を上書きする
-// (2026-05-10 仕様変更、knowledge.md 参照)。Unix epoch は「秒」必須なので Math.floor で潰す。
-const ARCHIVE_TTL_DAYS = 90;
-const archiveExpiresAt = (): number =>
-    Math.floor(Date.now() / 1000) + ARCHIVE_TTL_DAYS * 86400;
-// アーカイブ済み行に「あと N 日で削除」を出すための残日数計算。負の値は 0 に丸める。
-const remainingDaysUntilDelete = (expiresAt: number | null): number | null => {
-    if (expiresAt == null) return null;
-    const seconds = expiresAt - Math.floor(Date.now() / 1000);
-    return seconds <= 0 ? 0 : Math.ceil(seconds / 86400);
-};
-
-interface Citation {
-    uri: string;
-    page: number | null;
-}
 
 interface MessageRow {
     id: string;
@@ -39,42 +31,10 @@ interface MessageRow {
     createdAt: string;
 }
 
-interface ThreadRow {
-    id: string;
-    title: string;
-    summary: string;
-    summarizedCount: number;
-    archived: boolean;
-    // アーカイブ済み行で残り削除日数を表示するために保持。アクティブ行では null。
-    expiresAt: number | null;
-    updatedAt: string;
-}
-
-// a.json() フィールドは Amplify が JSON.parse 済みで返すが、保存形態によっては
-// string で返るケースもあるため両対応のパース関数。
-const parseCitations = (raw: unknown): Citation[] => {
-    if (!raw) return [];
-    let value: unknown = raw;
-    if (typeof value === 'string') {
-        try {
-            value = JSON.parse(value);
-        } catch {
-            return [];
-        }
-    }
-    if (!Array.isArray(value)) return [];
-    return value.map((c: unknown) => {
-        const obj = (c ?? {}) as Record<string, unknown>;
-        return {
-            uri: typeof obj.uri === 'string' ? obj.uri : '',
-            page: typeof obj.page === 'number' ? obj.page : null,
-        };
-    });
-};
-
 export default function Home() {
     const { user, signOut } = useAuthenticator((context) => [context.user]);
     const [threads, setThreads] = useState<ThreadRow[]>([]);
+    const [threadsLoaded, setThreadsLoaded] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [messages, setMessages] = useState<MessageRow[]>([]);
     const [question, setQuestion] = useState('');
@@ -94,32 +54,23 @@ export default function Home() {
         try {
             const { data, errors } = await client.models.Conversation.list({
                 limit: 100,
+                selectionSet: CONVERSATION_FIELDS,
             });
             if (errors && errors.length > 0) {
                 throw new Error(
                     errors.map((er) => er.message).join(' / '),
                 );
             }
-            const rows: ThreadRow[] = (data ?? [])
-                .map((d) => ({
-                    id: d.id,
-                    title: d.title,
-                    summary: d.summary ?? '',
-                    summarizedCount: d.summarizedCount ?? 0,
-                    // archived は新フィールド。null/undefined の既存レコードは false 扱い (アクティブ)。
-                    archived: d.archived === true,
-                    expiresAt: d.expiresAt ?? null,
-                    updatedAt: d.updatedAt,
-                }))
-                .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+            const rows = sortByUpdatedAtDesc((data ?? []).map(toThreadRow));
             setThreads(rows);
+            setThreadsLoaded(true);
             setError(null);
 
             // 2026-05-10: 旧仕様 (作成時 expiresAt = now + 90日) で作られたアクティブ会話は、
             // 放っておくと TTL で勝手に消えてしまうため null 化する移行処理。
             // 該当レコードが残っている初回ログイン時のみ走り、以降は何もしない (DynamoDB write 余計に発生しない)。
             // 紐付く Message の expiresAt も同様に null 化する (親子整合性)。
-            const orphans = rows.filter((r) => !r.archived && r.expiresAt != null);
+            const orphans = findOrphanActiveThreads(rows);
             if (orphans.length > 0) {
                 console.info(
                     `[migrate] ${orphans.length} 件のアクティブ会話を TTL 対象外に変更`,
@@ -133,6 +84,7 @@ export default function Home() {
                         const { data: msgs } = await client.models.Message.list({
                             filter: { conversationId: { eq: o.id } },
                             limit: 1000,
+                            selectionSet: MESSAGE_FIELDS,
                         });
                         await Promise.all(
                             (msgs ?? []).map((m) =>
@@ -155,6 +107,7 @@ export default function Home() {
             const { data, errors } = await client.models.Message.list({
                 filter: { conversationId: { eq: convId } },
                 limit: 1000,
+                selectionSet: MESSAGE_FIELDS,
             });
             if (errors && errors.length > 0) {
                 throw new Error(
@@ -240,6 +193,7 @@ export default function Home() {
             const { data: msgs } = await client.models.Message.list({
                 filter: { conversationId: { eq: id } },
                 limit: 1000,
+                selectionSet: MESSAGE_FIELDS,
             });
             await Promise.all(
                 (msgs ?? []).map((m) =>
@@ -264,6 +218,7 @@ export default function Home() {
             const { data: msgs } = await client.models.Message.list({
                 filter: { conversationId: { eq: id } },
                 limit: 1000,
+                selectionSet: MESSAGE_FIELDS,
             });
             await Promise.all(
                 (msgs ?? []).map((m) =>
@@ -288,6 +243,7 @@ export default function Home() {
         const { data: all } = await client.models.Message.list({
             filter: { conversationId: { eq: convId } },
             limit: 1000,
+            selectionSet: MESSAGE_FIELDS,
         });
         const sorted = (all ?? []).sort((a, b) =>
             a.createdAt.localeCompare(b.createdAt),
@@ -472,6 +428,7 @@ export default function Home() {
                 />
             )}
             <aside
+                data-threads-loaded={threadsLoaded ? 'true' : 'false'}
                 className={`w-72 shrink-0 flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 fixed inset-y-0 left-0 z-40 md:sticky md:top-0 md:z-auto transition-transform ${
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                 }`}

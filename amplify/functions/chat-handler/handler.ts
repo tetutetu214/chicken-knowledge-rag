@@ -26,6 +26,11 @@ import {
     BedrockAgentRuntimeClient,
     RetrieveCommand,
 } from '@aws-sdk/client-bedrock-agent-runtime';
+import {
+    type RawMessage,
+    parseHistory,
+    sanitizeHistory,
+} from './history';
 
 // 環境変数を必須として読み出す。未設定なら Lambda 初期化時に即例外で失敗させ、
 // silently 0 や空文字で処理が進む事故を防ぐ (Issue #31)。
@@ -80,50 +85,6 @@ interface ChatResponse {
 interface AppSyncEvent {
     arguments: ChatArguments;
 }
-
-interface RawMessage {
-    role: string;
-    content: string;
-}
-
-const parseHistory = (raw: string | null | undefined): RawMessage[] => {
-    if (!raw) return [];
-    try {
-        const parsed: unknown = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.map((m: unknown) => {
-            const obj = (m ?? {}) as Record<string, unknown>;
-            return {
-                role: typeof obj.role === 'string' ? obj.role : 'user',
-                content: typeof obj.content === 'string' ? obj.content : '',
-            };
-        });
-    } catch {
-        return [];
-    }
-};
-
-// Converse は user/assistant 交互で始まりが user、末尾が user (最新質問の前) である必要がある。
-// 履歴を防御的にクリーンアップする。
-const sanitizeHistory = (messages: RawMessage[]): RawMessage[] => {
-    const cleaned = messages.filter(
-        (m) =>
-            (m.role === 'user' || m.role === 'assistant')
-            && m.content.trim() !== '',
-    );
-    // 先頭の assistant は捨てる (user 始まりに揃える)
-    while (cleaned.length > 0 && cleaned[0].role === 'assistant') {
-        cleaned.shift();
-    }
-    // 末尾の user は捨てる (この後に新質問の user を追加するため)
-    while (
-        cleaned.length > 0
-        && cleaned[cleaned.length - 1].role === 'user'
-    ) {
-        cleaned.pop();
-    }
-    return cleaned;
-};
 
 const buildSystemPrompt = (params: {
     hasKb: boolean;
