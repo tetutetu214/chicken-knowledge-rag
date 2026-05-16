@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-11 (`fix/koke-required` で chat-handler の persona 指示を「1〜2回**だけ**」→「**必ず1回**、最大2回まで」に必須化。家族から「最近コケが入ってない」と指摘を受け、Nova Pro が上限のみの指示を「0でも可」と解釈してゼロ回が常態化していた問題に対処。定型文への「コケ」復活はしない。前回: 2026-05-11 PR #45 `feature/archive-revamp` に UI ラベル統一を追加コミット)
+最終更新: 2026-05-16 (`fix/topscore-selection-set` で Issue #16 Phase 1 の真のバグを修正。Phase 2 着手準備でデータ蓄積状況を見たところ、topScore が 18 件中 17 件で NULL 保存されていることを発見。Amplify Data v2 の `a.customType` optional フィールドが selection set から脱落するキャッシュ問題が原因 (knowledge.md 2026-05-16 参照)。`ChatResponse.topScore` を `a.float().required()` 化 + `web/node_modules` / `web/amplify_outputs.json` / `.amplify/` 全削除 → 再 install + sandbox 再デプロイで解消。ローカル dev で実機テスト 1 件、DDB に `topScore=0.8319` 保存を確認済み。前回: 2026-05-11 `fix/koke-required` で persona 指示を「1〜2回**だけ**」→「**必ず1回**、最大2回まで」に必須化。)
 
 ### 次回セッション開始時にやること
 
@@ -294,6 +294,14 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - [x] DynamoDB の `Message` テーブルに `topScore` が float で保存されていることを CLI で確認 (2026-05-06: `topScore=0.7332` を1件捕捉、knowledge.md 参照。閾値 0.7 の偽陽性議論は Phase 2 で再検討)
   - [x] スマホ閲覧時の視認性改善 — メッセージ表示をラベル上・本文下の縦並びにレイアウト変更 (PR #27 同梱)
   - [x] PR 作成 → main にマージ
+- [x] **Issue #16 Phase 1 バグ修正** topScore が selection set から脱落して NULL 保存される問題を解消 (`fix/topscore-selection-set`、2026-05-16)
+  - [x] Phase 2 着手前のデータ蓄積調査で topScore=NULL 17件、float 値 1件 (Phase 1 マージ直後の 0.7332 のみ) を発見
+  - [x] 原因特定: Amplify Data v2 の `a.customType` optional フィールドが selection set から脱落するキャッシュ問題 (knowledge.md 2026-05-16 参照)
+  - [x] `amplify/data/resource.ts` の `ChatResponse.topScore` を `a.float().required()` に変更 (`Message.topScore` は既存 NULL レコード互換のため `a.float()` のまま)
+  - [x] `web/node_modules` / `web/amplify_outputs.json` / `web/.next` / `.amplify/` を全削除 → `npm install` → `npx ampx sandbox --once --outputs-out-dir web` (UPDATE_COMPLETE 155秒)
+  - [x] ローカル `npm run dev` 起動 → 実機テスト 1 件 → DDB に `topScore=0.8319521248340607` 保存を確認
+  - [ ] 既存 NULL レコード 17件は放置 (Phase 2 ヒストグラム集計時にフロントで `topScore != null` フィルタで除外する方針)
+  - [ ] PR 作成 → main マージ → Amplify Hosting 自動ビルド → 本番でも 1 件投入して再検証
 - [ ] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— Phase 1 マージ後、1ヶ月程度の実データ蓄積を待ってから着手判断
 - [ ] **Issue #16 Phase 3** LLM 補助による棚卸サイクル — Phase 2 完了後に判断
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
