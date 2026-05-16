@@ -26,8 +26,12 @@ const schema = a.schema({
         citations: a.ref('Citation').array(),
         hasKbResults: a.boolean().required(),
         // KB Retrieve top-K のうち最大コサイン類似度。Issue #16 KB不足領域分析の入口。
-        // 0〜1.0、SCORE_THRESHOLD (0.75) 未満は KB根拠なし扱い。
-        topScore: a.float(),
+        // 0〜1.0、SCORE_THRESHOLD 未満は KB根拠なし扱い。
+        // required にしているのは Amplify Data v2 のデフォルト selection set 仕様による。
+        // optional (a.float()) のままだとフロントのキャッシュ次第で selection set から脱落し、
+        // resp.topScore が undefined になって DDB に NULL 保存される事故が起きる
+        // (2026-05-06 から 2026-05-10 まで実害発生、knowledge.md 参照)。
+        topScore: a.float().required(),
     }),
 
     SummarizeResponse: a.customType({
