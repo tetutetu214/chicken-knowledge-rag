@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-16 (`fix/topscore-selection-set` で Issue #16 Phase 1 の真のバグを修正。Phase 2 着手準備でデータ蓄積状況を見たところ、topScore が 18 件中 17 件で NULL 保存されていることを発見。Amplify Data v2 の `a.customType` optional フィールドが selection set から脱落するキャッシュ問題が原因 (knowledge.md 2026-05-16 参照)。`ChatResponse.topScore` を `a.float().required()` 化 + `web/node_modules` / `web/amplify_outputs.json` / `.amplify/` 全削除 → 再 install + sandbox 再デプロイで解消。ローカル dev で実機テスト 1 件、DDB に `topScore=0.8319` 保存を確認済み。前回: 2026-05-11 `fix/koke-required` で persona 指示を「1〜2回**だけ**」→「**必ず1回**、最大2回まで」に必須化。)
+最終更新: 2026-05-16 PM (`fix/list-selection-set-with-tests` でテスト整備 + 二次バグ修正。前 PR #47 で `ChatResponse.topScore` を required 化 + node_modules 再生成した結果、PR #41 で動いていた `Conversation.archived` も同じ selection set 脱落で本番のゴミ箱機能が壊れた事故への対処。修正は `web/lib/selectionSets.ts` に `CONVERSATION_FIELDS` / `MESSAGE_FIELDS` を定数化し、page.tsx の 6 箇所の `list()` で `selectionSet` を明示。さらにテスト体制を初めて整備: Vitest で純粋関数の単体テスト 41 件 (フロント 26 + Lambda 15)、Playwright で E2E 6 件 (auth ガード / archive フルサイクル / chat KB ヒット & 未ヒット / 新規作成切替 / モバイル UI)、認証は `auth.setup.ts` + storageState 共有で再ログイン不要。loadThreads 完了を `data-threads-loaded` マーカーで安定検出。`workers: 1` で順次実行に固定。手動検証で見逃した archived 機能のデグレを E2E が捕まえる仕組みを残した (knowledge.md 2026-05-16 参照)。前回: 2026-05-16 AM `fix/topscore-selection-set` で `ChatResponse.topScore` を required 化。)
 
 ### 次回セッション開始時にやること
 

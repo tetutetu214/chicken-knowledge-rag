@@ -6,7 +6,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +23,8 @@
     "constructs": "^10.6.0",
     "esbuild": "^0.28.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.6"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1041.0",
