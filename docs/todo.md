@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-16 PM (`fix/list-selection-set-with-tests` でテスト整備 + 二次バグ修正。前 PR #47 で `ChatResponse.topScore` を required 化 + node_modules 再生成した結果、PR #41 で動いていた `Conversation.archived` も同じ selection set 脱落で本番のゴミ箱機能が壊れた事故への対処。修正は `web/lib/selectionSets.ts` に `CONVERSATION_FIELDS` / `MESSAGE_FIELDS` を定数化し、page.tsx の 6 箇所の `list()` で `selectionSet` を明示。さらにテスト体制を初めて整備: Vitest で純粋関数の単体テスト 41 件 (フロント 26 + Lambda 15)、Playwright で E2E 6 件 (auth ガード / archive フルサイクル / chat KB ヒット & 未ヒット / 新規作成切替 / モバイル UI)、認証は `auth.setup.ts` + storageState 共有で再ログイン不要。loadThreads 完了を `data-threads-loaded` マーカーで安定検出。`workers: 1` で順次実行に固定。手動検証で見逃した archived 機能のデグレを E2E が捕まえる仕組みを残した (knowledge.md 2026-05-16 参照)。前回: 2026-05-16 AM `fix/topscore-selection-set` で `ChatResponse.topScore` を required 化。)
+最終更新: 2026-05-16 PM (`chore/sync-outputs-env-script` で sandbox → Hosting 世代ズレ事故への運用対策。PR #48 マージ後、本番で `archived/topScore is not a field of model` エラーが発覚。原因は Amplify Hosting が `AMPLIFY_OUTPUTS_GZ_B64` env からビルド時に schema を復元するのに、私が env を手動更新していなかったこと (= sandbox 再デプロイだけでは Hosting に新スキーマが届かない)。対策: `scripts/sync-outputs-env.mjs` で env を自動再生成 + `npm run sandbox` (sandbox + sync を 1 コマンドで) と `npm run sandbox:full` (sandbox 2 回回して即時 Hosting 反映) を package.json に追加。docs にも運用フローを明記。前回: 2026-05-16 PM `fix/list-selection-set-with-tests` でテスト体制整備。)
 
 ### 次回セッション開始時にやること
 
@@ -87,7 +87,11 @@
 ### 主要コマンド
 
 - ローカル起動: `cd web && npm run dev` → http://localhost:3000、サインインは User1/User2 のメアドと `~/.secrets/chicken-knowledge-rag.env` の `USER{1,2}_PASSWORD`
-- 再デプロイ: `source ~/.secrets/chicken-knowledge-rag.env && npx ampx sandbox --once --outputs-out-dir web`
+- **再デプロイ (推奨)**: `source ~/.secrets/chicken-knowledge-rag.env && npm run sandbox` — sandbox 後に `AMPLIFY_OUTPUTS_GZ_B64` を自動同期する。次回 sandbox 時に Amplify Hosting に反映される。
+- **本番即時反映**: `source ~/.secrets/chicken-knowledge-rag.env && npm run sandbox:full` — sandbox を 2 回回して env 更新 → Hosting への即時反映までを一括実行 (約 4 分)。スキーマ変更を本番に即時反映したいときに使う。
+- **生コマンドでの再デプロイ (非推奨、env 同期忘れ事故あり)**: `npx ampx sandbox --once --outputs-out-dir web` 単独。env 同期を忘れると本番が世代ズレで壊れる (2026-05-16 事故、knowledge.md 参照)。
+- 単体テスト: `npm test` (フロント `web/`) と `npm test` (root、Lambda) を別々に実行
+- E2E テスト: `cd web && source ~/.secrets/chicken-knowledge-rag.env && npm run test:e2e`
 - ローカル静的ビルド検証: `cd web && rm -rf .next out && npm run build && npx serve out -p 3000`
 - 全削除: `npx ampx sandbox delete` または CFn console で Stack 削除（**注意: Sandbox を本番として運用しているため削除禁止**）
 
