@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
@@ -446,10 +447,19 @@ export default function Home() {
                         void createThread();
                         setSidebarOpen(false);
                     }}
-                    className="m-3 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold"
+                    className="m-3 mb-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold"
                 >
                     + 新しい会話
                 </button>
+                {/* Issue #16 Phase 2: KB根拠なし質問の見返し画面への導線 */}
+                <Link
+                    href="/insights"
+                    className="mx-3 mb-3 py-2 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded text-sm font-medium text-center border border-zinc-200 dark:border-zinc-700"
+                    onClick={() => setSidebarOpen(false)}
+                    data-testid="insights-nav-link"
+                >
+                    📊 KB不足分析
+                </Link>
                 <div className="flex-1 overflow-y-auto px-2">
                     {threads.length === 0 && (
                         <p className="px-2 text-xs text-zinc-500 dark:text-zinc-400">
