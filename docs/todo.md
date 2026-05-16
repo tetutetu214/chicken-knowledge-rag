@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-16 PM (`chore/sync-outputs-env-script` で sandbox → Hosting 世代ズレ事故への運用対策。PR #48 マージ後、本番で `archived/topScore is not a field of model` エラーが発覚。原因は Amplify Hosting が `AMPLIFY_OUTPUTS_GZ_B64` env からビルド時に schema を復元するのに、私が env を手動更新していなかったこと (= sandbox 再デプロイだけでは Hosting に新スキーマが届かない)。対策: `scripts/sync-outputs-env.mjs` で env を自動再生成 + `npm run sandbox` (sandbox + sync を 1 コマンドで) と `npm run sandbox:full` (sandbox 2 回回して即時 Hosting 反映) を package.json に追加。docs にも運用フローを明記。前回: 2026-05-16 PM `fix/list-selection-set-with-tests` でテスト体制整備。)
+最終更新: 2026-05-16 夜 (Issue #16 Phase 2 着手判断。データ蓄積 10 日 / 正常 topScore 6 件のみだが、UI 完成度はサンプル数依存ではないため前倒し着手を決定。NULL レコード 22 件 (うち assistant 9 件) はフロントの `topScore != null` フィルタで自動除外する設計のため DDB は無操作。詳細方針は plan.md「Issue #16 Phase 2 — `/insights` BI 画面の実装方針」と knowledge.md 同日決定事項を参照。前回: 2026-05-16 PM `chore/sync-outputs-env-script` で sandbox → Hosting 世代ズレ事故への運用対策。)
 
 ### 次回セッション開始時にやること
 
@@ -304,9 +304,23 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - [x] `amplify/data/resource.ts` の `ChatResponse.topScore` を `a.float().required()` に変更 (`Message.topScore` は既存 NULL レコード互換のため `a.float()` のまま)
   - [x] `web/node_modules` / `web/amplify_outputs.json` / `web/.next` / `.amplify/` を全削除 → `npm install` → `npx ampx sandbox --once --outputs-out-dir web` (UPDATE_COMPLETE 155秒)
   - [x] ローカル `npm run dev` 起動 → 実機テスト 1 件 → DDB に `topScore=0.8319521248340607` 保存を確認
-  - [ ] 既存 NULL レコード 17件は放置 (Phase 2 ヒストグラム集計時にフロントで `topScore != null` フィルタで除外する方針)
-  - [ ] PR 作成 → main マージ → Amplify Hosting 自動ビルド → 本番でも 1 件投入して再検証
-- [ ] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— Phase 1 マージ後、1ヶ月程度の実データ蓄積を待ってから着手判断
+  - [x] 既存 NULL レコード 22件 (内訳: user メッセージ 13 件は仕様上正しい、assistant メッセージ 9 件が脱落分) は放置決定。Phase 2 でフロント側 `topScore != null` フィルタで除外する設計のため DDB 操作なし (2026-05-16 確認、knowledge.md 2026-05-16 決定事項参照)
+  - [x] PR 作成 → main マージ → Amplify Hosting 自動ビルド → 本番でも 1 件投入して再検証 (2026-05-16 完了)
+- [~] **Issue #16 Phase 2** KB 不足領域 BI 画面（`/insights`）— 2026-05-16 着手 (データ蓄積 10 日で前倒し、UI 完成度はサンプル数依存ではないため)
+  - 詳細方針: `plan.md` 「Issue #16 Phase 2 — `/insights` BI 画面の実装方針」
+  - ブランチ: `feature/insights-dashboard`
+  - 採用: recharts (SVG/React コンポーネント方式、家族のみ × 数百件規模で SVG の重さは非問題)、CSV は自前生成 (列 5 で依存追加不要)
+  - 集計ロジックは `web/lib/insights.ts` に純関数として切り出し、Vitest で単体テスト + Playwright E2E (`tests/insights.spec.ts`)
+  - [x] feature ブランチ作成 + recharts インストール
+  - [x] `web/lib/insights.ts` (`pairUserAssistant` / `monthlyBuckets` / `topScoreHistogram` / `toCsv` / `summarize`)
+  - [x] `web/app/insights/page.tsx` (サマリーカード 4 枚 + 月次棒グラフ + topScore ヒストグラム + 一覧 + CSV ボタン)
+  - [x] サイドバー (`web/app/page.tsx`) に `/insights` 導線追加
+  - [x] 単体テスト (`web/lib/insights.test.ts`、17 件追加 → 合計 45 件 pass)
+  - [x] E2E テスト (`web/tests/insights.spec.ts`、3 件 pass、`data-insights-loaded` マーカー方式)
+  - [x] `npm run build` 成功 (`/insights` が static prerender に乗ることを確認)
+  - [ ] PR 作成 → main マージ → Hosting 反映 → 本番 smoke
+  - [ ] todo.md / knowledge.md 結果反映 (PR マージ後)
+  - **既知の警告 (PR でコメントする)**: recharts ResponsiveContainer の `width(-1) height(-1)` 警告が初期描画時にコンソールに出る。recharts v3 の親要素サイズ未確定タイミングでの既知挙動で機能影響なし。気になるようなら後続 PR で対処
 - [ ] **Issue #16 Phase 3** LLM 補助による棚卸サイクル — Phase 2 完了後に判断
 - [x] **Issue #18** systemPrompt 改善 (リスク階層 L1/L2/L3 で専門家相談を出し分け、回答長さ800字、引用フォーマット `[S1]` + `## 出典`、PR #24 で完了、2026-05-05)
 - [x] **ペルソナ「コケ語尾」緩和** (家族フィードバック「毎回コケつけすぎて読みにくい」対応。全文必須 → 全体で1〜2回・自然な位置のみに変更、定型文4箇所のコケも撤去。PR #38、2026-05-09)
