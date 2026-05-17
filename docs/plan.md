@@ -168,3 +168,53 @@ KB 拡充の経路 [3] の出口。Phase 1 (`topScore` の DDB 保存) は PR #2
 - LLM 補助分類 (`analyzeGaps` mutation, Haiku 4.5 で未解決質問をカテゴリ語彙に分類) → Issue #16 Phase 3
 - カテゴリ自動付与 / フィルタ
 - 一覧から会話への直接遷移 (`/?thread=xxx`) → 現状クエパラでスレッド開く実装ないため別タスク
+
+## Passkey 認証導入計画 (2026-05-17 起案)
+
+家族用アプリのログイン体験を改善するため、Cognito ネイティブ WebAuthn (Passkey) を email/password と併用する形で導入する。Issue #32 (Cognito sign-up 無効化) より先行して着手し、Issue #32 自体は将来「パスキーのみ運用」に切り替えるときに合わせ技で処理する。
+
+### 採用理由
+
+- パスワード入力を排除し、家族の認証手間とパスワード使い回しリスクを削減
+- スマホの生体認証 (Touch ID / Face ID / PIN) でログイン可能
+- AWS Cognito ネイティブ対応 (2024年末) で自前の Custom Auth Challenge 不要
+
+### 採用しない代替案
+
+| 代替案 | 不採用理由 |
+|---|---|
+| Custom Auth Challenge 方式 | Cognito ネイティブ対応前の旧実装。コード量多くメンテ負担大 |
+| email OTP (`otpLogin: true`) | パスワードよりはマシだが、指紋/顔の利便性に劣る |
+| SMS OTP | SMS コスト発生、パスキーの方が安全 |
+
+### 必須前提
+
+- **Cognito User Pool は Essentials ティア以上** (LITE では WebAuthn 不可)
+- `relyingPartyId` は Amplify Hosting 自動ドメイン (`xxxxx.amplifyapp.com`)。**カスタムドメイン未設定**。設定すると `relyingPartyId` 変更で登録済みパスキーが無効化されるため、現状の自動ドメインで割り切る (将来カスタムドメイン化する場合は全員パスキー再登録の覚悟が必要)
+- `userVerification: 'required'` で生体認証 or PIN を必須化
+
+### 段階的移行プラン
+
+| Phase | 範囲 | PR | 状態 |
+|---|---|---|---|
+| Phase 1 | バックエンド: `defineAuth` に webAuthn 追加 + Cognito Essentials ティア化 | PR1 (`feature/passkey-backend`) | 未着手 |
+| Phase 2 | フロント: サイドバーに「パスキー管理」ボタン → モーダルで登録/一覧/削除 | PR2 (`feature/passkey-frontend`) | 未着手 |
+| (将来) | `loginWith` から email を外しパスキーのみに切替 | 別PR | 家族全員登録完了後に判断 |
+
+### Phase 3 (ログイン画面改造) を実施しない理由
+
+「ログイン画面に『パスキーでサインイン』ボタンを並列表示する」案は今回スコープ外。家族 5〜10 人全員がパスキー登録を完了するまでは email/password ログインを使い続け、完了後に一気にパスキー専用 (将来 PR) に切り替える方がシンプル。「2つのログイン方法が並ぶ画面」を経由する期間を作らない。
+
+### Phase 2 の UI 配置 (2026-05-17 確定)
+
+「専用設定ページ」ではなく、既存サイドバー下部に「🔑 パスキー管理」ボタンを追加し、押下でモーダルを開く方式。理由:
+
+- 家族 5〜10 人で、パスキー登録は1人あたり生涯1〜数回しか触らない画面 → 専用ページは大げさ
+- 既存ナビゲーション (サイドバー) からゼロ歩で到達できる
+- モーダル内で「登録」「一覧」「削除」をワンストップで完結
+
+### スコープ外 / 将来検討
+
+- パスキー必須化 (email/password 撤去) → 家族全員登録完了後、Issue #32 と合わせ技
+- カスタムドメイン化 → 現時点では amplifyapp.com で割り切る
+- ログイン画面側のパスキーログインボタン (Phase 3) → 上記理由でスキップ
