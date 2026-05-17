@@ -23,15 +23,25 @@ setup('User1 でログインして storageState を保存する', async ({ page 
 
     await page.goto('/');
 
-    // Amplify UI Authenticator のサインインフォーム
+    // Amplify UI Authenticator のサインインフォーム。
+    // WebAuthn 有効化 (2026-05-17) 以降、サインインは 2 段階:
+    //   画面 1: メアド + パスワード 両方入力 → 「サインイン」(画面 1 のパスワードは画面遷移でクリアされる)
+    //   画面 2: パスワード再入力 → 「Sign In with Password」で完了 (「Sign In with Passkey」も並ぶ)
     await page
         .getByRole('textbox', { name: /メールアドレス|Email/i })
         .fill(email);
     await page
-        .getByRole('textbox', { name: /パスワード|Password/i })
+        .getByRole('textbox', { name: /^Password$|^パスワード$/i })
         .fill(password);
     await page
         .getByRole('button', { name: /^サインイン$|^Sign in$/i })
+        .click();
+
+    await page
+        .getByRole('textbox', { name: /^Password$|^パスワード$/i })
+        .fill(password);
+    await page
+        .getByRole('button', { name: /Sign In with Password/i })
         .click();
 
     // ログイン成功後、サイドバーのアプリ名 (Cocco RAG ロゴ) が表示される。

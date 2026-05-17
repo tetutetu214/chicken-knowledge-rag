@@ -367,14 +367,14 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ### Phase 1: バックエンド (PR1, ブランチ: `feature/passkey-backend`)
 
-- [ ] **理解度テスト 3問パス** (パスキーの本質 / Cognito 認証フロー / トレードオフ)
-- [ ] GitHub Issue 起票 (本機能用、ラベル: `enhancement` `priority:P2`)
-- [ ] ブランチ作成: `git switch -c feature/passkey-backend`
-- [ ] `amplify/auth/resource.ts` に `webAuthn: { relyingPartyId, userVerification: 'required' }` 追加 (email/password は残す)
-- [ ] Cognito User Pool ティア確認: sandbox デプロイで現在のティアを `aws cognito-idp describe-user-pool` で確認
-- [ ] LITE の場合は CDK escape hatch (`backend.auth.resources.cfnResources.cfnUserPool.userPoolTier = 'ESSENTIALS'`) で Essentials に上書き
-- [ ] `relyingPartyId` の値を本番 Amplify ドメイン (`xxxxx.amplifyapp.com`) で確定 (sandbox 動作は localhost 自動扱い)
-- [ ] sandbox デプロイ: `npx ampx sandbox --outputs-out-dir web` で email/password ログインが今まで通り動くことを目視確認
+- [x] **理解度テスト 3問パス** (パスキーの本質 / Cognito 認証フロー / トレードオフ) — 2026-05-17 再テストで 3/3 合格 (鍵の所在 / フィッシング耐性=ドメイン照合 / 併用の理由=リカバリ保険 / 生体認証=ローカルロック / relyingPartyId 変更=既存パスキー無効化)
+- [x] GitHub Issue 起票 (本機能用、ラベル: `enhancement` `priority/P2`) — Issue #53 起票済み
+- [x] ブランチ作成: `git switch -c feature/passkey-backend`
+- [x] `amplify/auth/resource.ts` に `webAuthn: { relyingPartyId, userVerification: 'required' }` 追加 (email/password は残す、relyingPartyId は `process.env.PASSKEY_RPID` 経由で `~/.secrets/` から取得)
+- [x] Cognito User Pool ティア確認: 既に ESSENTIALS だったため上書き不要
+- [x] LITE の場合は CDK escape hatch (`backend.auth.resources.cfnResources.cfnUserPool.userPoolTier = 'ESSENTIALS'`) で Essentials に上書き — 該当せず (既に ESSENTIALS)
+- [x] `relyingPartyId` の値を本番 Amplify ドメイン (`<branch>.<appId>.amplifyapp.com`) で確定し `~/.secrets/chicken-knowledge-rag.env` の `PASSKEY_RPID` に保存
+- [x] sandbox デプロイ: `npm run sandbox` で UPDATE_COMPLETE 80 秒、CFn テンプレート上で `WebAuthnRelyingPartyID` / `WebAuthnUserVerification` 両プロパティ反映確認、`AllowedFirstAuthFactors` に `WEB_AUTHN` 追加確認、Playwright E2E 9 件 pass で email/password ログイン機能の回帰なしを確認 (auth.setup を新 UI の 2 段階フローに追従させた)
 - [ ] PR1 作成 → main マージ → Amplify Hosting ビルド SUCCEED を確認
 
 ### Phase 2: フロント (PR2, ブランチ: `feature/passkey-frontend`)
