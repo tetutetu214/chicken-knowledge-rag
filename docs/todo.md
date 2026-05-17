@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-17 夜 (PR #52 main マージ → Amplify Hosting ビルド #38 SUCCEED。コケ語尾を回数制約 → 位置制約 (回答本文最終文の文末を必ず「〜コケ。」で締める) に切替。Lambda は sandbox 再デプロイで本番反映済み。残る Issue #16 Phase 2 のブラウザ目視 smoke はてつてつ担当のまま継続。前回: 2026-05-16 深夜 Issue #16 Phase 2 PR #50 マージ・本番反映確認)
+最終更新: 2026-05-17 夜 (Phase 1 パスキー認証導入: PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED。`defineAuth.loginWith.webAuthn` で Cognito User Pool に WebAuthn 反映、email/password と併用継続。E2E 9 件 pass で回帰なし確認。Authenticator が 2 段階フローに変わったため auth.setup も追従。次回は Phase 2 (`feature/passkey-frontend` でサイドバー🔑モーダル + i18n 日本語訳追加)。前回: 同日 PR #52 main マージ → Amplify Hosting ビルド #38 SUCCEED。コケ語尾を回数制約 → 位置制約 (回答本文最終文の文末を必ず「〜コケ。」で締める) に切替。残る Issue #16 Phase 2 のブラウザ目視 smoke はてつてつ担当のまま継続)
 
 ### 次回セッション開始時にやること
 
@@ -375,7 +375,7 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] LITE の場合は CDK escape hatch (`backend.auth.resources.cfnResources.cfnUserPool.userPoolTier = 'ESSENTIALS'`) で Essentials に上書き — 該当せず (既に ESSENTIALS)
 - [x] `relyingPartyId` の値を本番 Amplify ドメイン (`<branch>.<appId>.amplifyapp.com`) で確定し `~/.secrets/chicken-knowledge-rag.env` の `PASSKEY_RPID` に保存
 - [x] sandbox デプロイ: `npm run sandbox` で UPDATE_COMPLETE 80 秒、CFn テンプレート上で `WebAuthnRelyingPartyID` / `WebAuthnUserVerification` 両プロパティ反映確認、`AllowedFirstAuthFactors` に `WEB_AUTHN` 追加確認、Playwright E2E 9 件 pass で email/password ログイン機能の回帰なしを確認 (auth.setup を新 UI の 2 段階フローに追従させた)
-- [ ] PR1 作成 → main マージ → Amplify Hosting ビルド SUCCEED を確認
+- [x] PR1 作成 → main マージ (PR #54、squash マージ commit `61e79e9`、2026-05-17) → Amplify Hosting ビルド Job #40 SUCCEED 確認済み (2026-05-17 夜)
 
 ### Phase 2: フロント (PR2, ブランチ: `feature/passkey-frontend`)
 
