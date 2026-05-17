@@ -359,3 +359,39 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 ### 廃案
 
 - 配偶者向け簡易マニュアル → 不要 (UI が分かりやすければマニュアル不要、2026-05-05 ユーザー判断)
+
+## パスキー認証導入 (2026-05-17 起案)
+
+設計判断と採用理由は `plan.md` の「Passkey 認証導入計画」、仕様は `spec.md` §4-2-1 を参照。
+
+### Phase 1: バックエンド (PR1, ブランチ: `feature/passkey-backend`)
+
+- [ ] **理解度テスト 3問パス** (パスキーの本質 / Cognito 認証フロー / トレードオフ)
+- [ ] GitHub Issue 起票 (本機能用、ラベル: `enhancement` `priority:P2`)
+- [ ] ブランチ作成: `git switch -c feature/passkey-backend`
+- [ ] `amplify/auth/resource.ts` に `webAuthn: { relyingPartyId, userVerification: 'required' }` 追加 (email/password は残す)
+- [ ] Cognito User Pool ティア確認: sandbox デプロイで現在のティアを `aws cognito-idp describe-user-pool` で確認
+- [ ] LITE の場合は CDK escape hatch (`backend.auth.resources.cfnResources.cfnUserPool.userPoolTier = 'ESSENTIALS'`) で Essentials に上書き
+- [ ] `relyingPartyId` の値を本番 Amplify ドメイン (`xxxxx.amplifyapp.com`) で確定 (sandbox 動作は localhost 自動扱い)
+- [ ] sandbox デプロイ: `npx ampx sandbox --outputs-out-dir web` で email/password ログインが今まで通り動くことを目視確認
+- [ ] PR1 作成 → main マージ → Amplify Hosting ビルド SUCCEED を確認
+
+### Phase 2: フロント (PR2, ブランチ: `feature/passkey-frontend`)
+
+- [ ] ブランチ作成: `git switch -c feature/passkey-frontend`
+- [ ] サイドバー (`web/app/page.tsx` のサイドバー要素) 下部に「🔑 パスキー管理」ボタンを追加
+- [ ] モーダルコンポーネント新規作成 (`web/app/PasskeyManagementModal.tsx` 等、命名は実装時に確定)
+- [ ] 「パスキーを登録」ボタン → `associateWebAuthnCredential()` 呼び出し
+- [ ] 「登録済み一覧」表示 → `listWebAuthnCredentials()` 呼び出し (credentialId / friendlyName / createdAt)
+- [ ] 「削除」ボタン → `deleteWebAuthnCredential({ credentialId })` 呼び出し
+- [ ] エラーハンドリング: `UserCancelledException` (ユーザーキャンセル) / ブラウザ非対応 / 既登録重複 等を UI で吸収
+- [ ] Vitest 単体テスト: モーダル開閉のみ (Amplify API はモック、生体認証は単体不可)
+- [ ] Playwright E2E: モーダル開閉と登録済み 0 件時の空メッセージ表示のみ (実際の登録は生体認証API依存で E2E 化困難)
+- [ ] **手動目視テスト** (てつてつ担当): PC ブラウザ Chrome + スマホ Safari で実機登録 → 一覧表示 → 削除の往復確認
+- [ ] PR2 作成 → main マージ → Amplify Hosting 本番反映 → 家族に「パスキー登録のお知らせ」を周知
+
+### 将来 PR (家族全員パスキー登録完了後)
+
+- [ ] `defineAuth` の `loginWith` から `email: true` を撤去、パスキーのみに切替
+- [ ] Issue #32 (sign-up 無効化) と合わせ技で実装
+- [ ] パスワード忘れ救済策の検討 (email OTP `otpLogin: true` を残すか、てつてつが管理画面から手動リセットするか)
