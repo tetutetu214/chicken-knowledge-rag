@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-18 未明 (Phase 2 パスキーフロント実装: Codex (codex:codex-rescue) に初委譲で `PasskeyManagementModal.tsx` + サイドバー導線 + i18n 5 件追加 + Vitest 3 件 + Playwright 1 件を一括実装。Vitest 48 件 / E2E 10 件全 pass。`auth.setup.ts` を i18n 翻訳追加に追従させ「Sign In with Password|パスワードでサインイン」OR regex 両対応化。Codex 委譲の学びは ~/.claude/CLAUDE.md と個人メモリ feedback_codex_delegation_protocol / playwright_parallel_test_results_collision / i18n_breaks_e2e_locator / reference_codex_companion_path に格納。次は PR2 作成 → マージ → 本番反映 → てつてつ手動目視 (PC Chrome + スマホ Safari)。前回: 同日 Phase 1 PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED)
+最終更新: 2026-05-18 未明 (Phase 2 パスキーフロント PR #55 main マージ → Amplify Hosting ビルド Job #42 SUCCEED 確認済み。Codex (codex:codex-rescue) 初委譲で `PasskeyManagementModal.tsx` + サイドバー導線 + i18n 5 件追加 + Vitest 3 件 + Playwright 1 件を一括実装。Vitest 48 件 / E2E 10 件全 pass。`auth.setup.ts` を i18n 翻訳追加に追従させ「Sign In with Password|パスワードでサインイン」OR regex 両対応化。Codex 委譲の学びは ~/.claude/CLAUDE.md と個人メモリ feedback_codex_delegation_protocol / playwright_parallel_test_results_collision / i18n_breaks_e2e_locator / reference_codex_companion_path に格納。Issue #53 (Phase 1+2) クローズ可、残るは てつてつ実機目視 (PC Chrome + スマホ Safari) と家族への周知。次回は将来 PR (家族全員パスキー登録完了後に `loginWith.email` 撤去、Issue #32 と合わせ技) か他 Issue 着手。前回: 同日 Phase 1 PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED)
 
 ### 次回セッション開始時にやること
 
@@ -391,8 +391,9 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 - [x] i18n 日本語訳追加 (`ConfigureAmplifyClientSide.tsx`): `Sign In with Password` / `Sign In with Passkey` / `Passkey` / `Add passkey` / `WebAuthn is not supported on this device` を 5 件追加 (既存上書きなし)
 - [x] auth.setup.ts を i18n 翻訳追加に追従 (`name: /Sign In with Password|パスワードでサインイン/i` で OR regex 両対応化)
 - [x] テスト: Vitest 48 件 pass、Playwright E2E 10 件 pass (passkey.spec.ts 含む) でクロスチェック完了
-- [ ] **手動目視テスト** (てつてつ担当): PC ブラウザ Chrome + スマホ Safari で実機登録 → 一覧表示 → 削除の往復確認 (PR2 マージ後の本番反映時)
-- [ ] PR2 作成 → main マージ → Amplify Hosting 本番反映 → 家族に「パスキー登録のお知らせ」を周知
+- [ ] **手動目視テスト** (てつてつ担当): PC ブラウザ Chrome + スマホ Safari で実機登録 → 一覧表示 → 削除の往復確認 (本番反映済み、随時実施)
+- [x] PR2 作成 → main マージ (PR #55、squash マージ commit `7adb8bca`、2026-05-18) → Amplify Hosting ビルド Job #42 SUCCEED 確認済み (2026-05-18 未明)
+- [ ] 家族に「パスキー登録のお知らせ」を周知 (てつてつ担当)
 
 ### 将来 PR (家族全員パスキー登録完了後)
 
