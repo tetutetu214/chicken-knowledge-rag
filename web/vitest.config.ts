@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     test: {
         environment: 'node',
-        include: ['lib/**/*.test.ts'],
+        include: ['lib/**/*.test.ts', 'app/**/*.test.tsx'],
         // E2E の Playwright テスト (tests/) は Vitest から除外する。
         exclude: ['node_modules', 'tests', '.next', 'out'],
     },
