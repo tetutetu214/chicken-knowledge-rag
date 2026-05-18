@@ -41,7 +41,7 @@ setup('User1 でログインして storageState を保存する', async ({ page 
         .getByRole('textbox', { name: /^Password$|^パスワード$/i })
         .fill(password);
     await page
-        .getByRole('button', { name: /Sign In with Password/i })
+        .getByRole('button', { name: /Sign In with Password|パスワードでサインイン/i })
         .click();
 
     // ログイン成功後、サイドバーのアプリ名 (Cocco RAG ロゴ) が表示される。
