@@ -15,6 +15,7 @@ import {
     toThreadRow,
 } from '../lib/threads';
 import { CONVERSATION_FIELDS, MESSAGE_FIELDS } from '../lib/selectionSets';
+import PasskeyManagementModal from './PasskeyManagementModal';
 
 const client = generateClient<Schema>();
 
@@ -43,6 +44,7 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     // スマホ用: 左ペイン (サイドバー) の表示・非表示。PC (md以上) では常に表示。
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const showError = (label: string, e: unknown) => {
@@ -451,6 +453,22 @@ export default function Home() {
                 >
                     + 新しい会話
                 </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsPasskeyModalOpen(true);
+                        setSidebarOpen(false);
+                    }}
+                    className={[
+                        'mx-3 mb-1 py-2 px-3 bg-zinc-100 hover:bg-zinc-200',
+                        'dark:bg-zinc-800 dark:hover:bg-zinc-700',
+                        'text-zinc-700 dark:text-zinc-200 rounded text-sm',
+                        'font-medium text-center border border-zinc-200',
+                        'dark:border-zinc-700',
+                    ].join(' ')}
+                >
+                    🔑 パスキー管理
+                </button>
                 {/* Issue #16 Phase 2: KB根拠なし質問の見返し画面への導線 */}
                 <Link
                     href="/insights"
@@ -703,6 +721,10 @@ export default function Home() {
                     </div>
                 </div>
             </section>
+            <PasskeyManagementModal
+                open={isPasskeyModalOpen}
+                onClose={() => setIsPasskeyModalOpen(false)}
+            />
         </main>
     );
 }

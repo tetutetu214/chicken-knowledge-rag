@@ -31,6 +31,12 @@ I18n.putVocabulariesForLanguage('ja', {
     'Please confirm your Password': 'パスワードを再入力してください',
     'Sign Out': 'サインアウト',
     'Hello': 'ようこそ',
+    'Sign In with Password': 'パスワードでサインイン',
+    'Sign In with Passkey': 'パスキーでサインイン',
+    'Passkey': 'パスキー',
+    'Add passkey': 'パスキーを追加',
+    'WebAuthn is not supported on this device':
+        'このデバイスはパスキーに対応していません',
 });
 
 export default function ConfigureAmplifyClientSide() {
