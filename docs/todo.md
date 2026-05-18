@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-17 夜 (Phase 1 パスキー認証導入: PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED。`defineAuth.loginWith.webAuthn` で Cognito User Pool に WebAuthn 反映、email/password と併用継続。E2E 9 件 pass で回帰なし確認。Authenticator が 2 段階フローに変わったため auth.setup も追従。次回は Phase 2 (`feature/passkey-frontend` でサイドバー🔑モーダル + i18n 日本語訳追加)。前回: 同日 PR #52 main マージ → Amplify Hosting ビルド #38 SUCCEED。コケ語尾を回数制約 → 位置制約 (回答本文最終文の文末を必ず「〜コケ。」で締める) に切替。残る Issue #16 Phase 2 のブラウザ目視 smoke はてつてつ担当のまま継続)
+最終更新: 2026-05-18 未明 (Phase 2 パスキーフロント実装: Codex (codex:codex-rescue) に初委譲で `PasskeyManagementModal.tsx` + サイドバー導線 + i18n 5 件追加 + Vitest 3 件 + Playwright 1 件を一括実装。Vitest 48 件 / E2E 10 件全 pass。`auth.setup.ts` を i18n 翻訳追加に追従させ「Sign In with Password|パスワードでサインイン」OR regex 両対応化。Codex 委譲の学びは ~/.claude/CLAUDE.md と個人メモリ feedback_codex_delegation_protocol / playwright_parallel_test_results_collision / i18n_breaks_e2e_locator / reference_codex_companion_path に格納。次は PR2 作成 → マージ → 本番反映 → てつてつ手動目視 (PC Chrome + スマホ Safari)。前回: 同日 Phase 1 PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED)
 
 ### 次回セッション開始時にやること
 
@@ -379,16 +379,19 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
 
 ### Phase 2: フロント (PR2, ブランチ: `feature/passkey-frontend`)
 
-- [ ] ブランチ作成: `git switch -c feature/passkey-frontend`
-- [ ] サイドバー (`web/app/page.tsx` のサイドバー要素) 下部に「🔑 パスキー管理」ボタンを追加
-- [ ] モーダルコンポーネント新規作成 (`web/app/PasskeyManagementModal.tsx` 等、命名は実装時に確定)
-- [ ] 「パスキーを登録」ボタン → `associateWebAuthnCredential()` 呼び出し
-- [ ] 「登録済み一覧」表示 → `listWebAuthnCredentials()` 呼び出し (credentialId / friendlyName / createdAt)
-- [ ] 「削除」ボタン → `deleteWebAuthnCredential({ credentialId })` 呼び出し
-- [ ] エラーハンドリング: `UserCancelledException` (ユーザーキャンセル) / ブラウザ非対応 / 既登録重複 等を UI で吸収
-- [ ] Vitest 単体テスト: モーダル開閉のみ (Amplify API はモック、生体認証は単体不可)
-- [ ] Playwright E2E: モーダル開閉と登録済み 0 件時の空メッセージ表示のみ (実際の登録は生体認証API依存で E2E 化困難)
-- [ ] **手動目視テスト** (てつてつ担当): PC ブラウザ Chrome + スマホ Safari で実機登録 → 一覧表示 → 削除の往復確認
+- [x] ブランチ作成: `git switch -c feature/passkey-frontend`
+- [x] サイドバー (`web/app/page.tsx` のサイドバー要素) 下部に「🔑 パスキー管理」ボタンを追加 (モバイル時はサイドバー自動閉じ)
+- [x] モーダルコンポーネント新規作成 (`web/app/PasskeyManagementModal.tsx`、role="dialog" + aria-modal、ダークモード対応)
+- [x] 「パスキーを登録」ボタン → `associateWebAuthnCredential()` 呼び出し
+- [x] 「登録済み一覧」表示 → `listWebAuthnCredentials()` 呼び出し (credentialId / friendlyCredentialName / createdAt)
+- [x] 「削除」ボタン → `deleteWebAuthnCredential({ credentialId })` 呼び出し
+- [x] エラーハンドリング: `UserCancelledException` (ユーザーキャンセル) は静かに無視、その他 (ブラウザ非対応 / 既登録重複) は赤帯で UI 表示
+- [x] Vitest 単体テスト: モーダル開閉のみ (`renderToStaticMarkup` で SSR レベル、Amplify API は `vi.mock` で完全モック)
+- [x] Playwright E2E: モーダル開閉と登録ボタン表示のみ (生体認証 API は触らない)
+- [x] i18n 日本語訳追加 (`ConfigureAmplifyClientSide.tsx`): `Sign In with Password` / `Sign In with Passkey` / `Passkey` / `Add passkey` / `WebAuthn is not supported on this device` を 5 件追加 (既存上書きなし)
+- [x] auth.setup.ts を i18n 翻訳追加に追従 (`name: /Sign In with Password|パスワードでサインイン/i` で OR regex 両対応化)
+- [x] テスト: Vitest 48 件 pass、Playwright E2E 10 件 pass (passkey.spec.ts 含む) でクロスチェック完了
+- [ ] **手動目視テスト** (てつてつ担当): PC ブラウザ Chrome + スマホ Safari で実機登録 → 一覧表示 → 削除の往復確認 (PR2 マージ後の本番反映時)
 - [ ] PR2 作成 → main マージ → Amplify Hosting 本番反映 → 家族に「パスキー登録のお知らせ」を周知
 
 ### 将来 PR (家族全員パスキー登録完了後)
