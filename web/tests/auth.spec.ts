@@ -1,34 +1,60 @@
 import { expect, test } from '@playwright/test';
 
-// 未認証時の Authenticator ガード。
+// 未認証時の自前サインイン画面ガード。
 // このファイルは playwright.config.ts の chromium-anon project (storageState なし)
 // だけが実行する。chromium-authed project では実行されない。
+//
+// 2026-05-19: Amplify UI Authenticator を捨てて自前 SignInScreen に切替済み。
+// パスキー優先 UX のため、パスワード入力欄は初期非表示で fallback リンク経由で開く。
 
-test.describe('Cognito 認証ガード', () => {
-    test('未認証時は Authenticator のサインイン画面が表示される', async ({
+test.describe('自前サインイン画面ガード', () => {
+    test('未認証時はメアド入力とパスキーボタンが表示される', async ({
         page,
     }) => {
         await page.goto('/');
 
-        // Amplify UI Authenticator のサインインフォーム
+        // メアド入力欄
         await expect(
-            page.getByRole('textbox', { name: /メールアドレス|Email/i }),
+            page.getByRole('textbox', { name: /メールアドレス/ }),
         ).toBeVisible({ timeout: 10_000 });
+
+        // メインの「🔑 パスキーでサインイン」ボタン
         await expect(
-            page.getByRole('textbox', { name: /パスワード|Password/i }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole('button', { name: /^サインイン$|^Sign in$/i }),
+            page.getByRole('button', { name: /パスキーでサインイン/ }),
         ).toBeVisible();
 
-        // hideSignUp 設定により「Create Account」タブが出ないことを確認
+        // パスワードでサインインへのフォールバックリンク (初期は折りたたみ)
         await expect(
-            page.getByRole('tab', { name: /Create Account|アカウントを作成/i }),
+            page.getByRole('link', { name: /パスワードでサインイン/ }),
+        ).toBeVisible();
+
+        // パスワード入力欄は初期非表示
+        await expect(
+            page.getByRole('textbox', { name: /^パスワード$/ }),
         ).toHaveCount(0);
 
-        // 認証後ロゴ (Cocco RAG) は出ない
+        // ログイン後 UI (サインアウトボタン) は出ない
         await expect(
-            page.getByRole('heading', { name: /Cocco RAG/i }),
+            page.getByRole('button', { name: /サインアウト/ }),
         ).toHaveCount(0);
+    });
+
+    test('パスワードでサインインリンクを押すとパスワード入力欄が現れる', async ({
+        page,
+    }) => {
+        await page.goto('/');
+
+        await page
+            .getByRole('link', { name: /パスワードでサインイン/ })
+            .click();
+
+        await expect(
+            page.getByRole('textbox', { name: /^パスワード$/ }),
+        ).toBeVisible();
+
+        // 展開後は同じ文言の送信ボタン (role=button) も現れる
+        await expect(
+            page.getByRole('button', { name: /パスワードでサインイン/ }),
+        ).toBeVisible();
     });
 });

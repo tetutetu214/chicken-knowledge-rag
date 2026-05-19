@@ -23,32 +23,27 @@ setup('User1 でログインして storageState を保存する', async ({ page 
 
     await page.goto('/');
 
-    // Amplify UI Authenticator のサインインフォーム。
-    // WebAuthn 有効化 (2026-05-17) 以降、サインインは 2 段階:
-    //   画面 1: メアド + パスワード 両方入力 → 「サインイン」(画面 1 のパスワードは画面遷移でクリアされる)
-    //   画面 2: パスワード再入力 → 「Sign In with Password」で完了 (「Sign In with Passkey」も並ぶ)
+    // 自前ログイン画面のパスワード fallback を開いてログインする。
     await page
-        .getByRole('textbox', { name: /メールアドレス|Email/i })
+        .getByRole('link', { name: /パスワードでサインイン/ })
+        .click();
+    await page
+        .getByRole('textbox', { name: /メールアドレス/ })
         .fill(email);
     await page
-        .getByRole('textbox', { name: /^Password$|^パスワード$/i })
+        .getByLabel(/^パスワード$/)
         .fill(password);
     await page
-        .getByRole('button', { name: /^サインイン$|^Sign in$/i })
+        .getByRole('button', { name: /パスワードでサインイン/ })
         .click();
 
-    await page
-        .getByRole('textbox', { name: /^Password$|^パスワード$/i })
-        .fill(password);
-    await page
-        .getByRole('button', { name: /Sign In with Password|パスワードでサインイン/i })
-        .click();
-
-    // ログイン成功後、サイドバーのアプリ名 (Cocco RAG ロゴ) が表示される。
-    // Amplify Authenticator のサインアウト後に Amplify が JWT 取得 → useAuthenticator が再描画する流れで
-    // 数秒かかることがあるため timeout を長めにとる。
+    // ログイン成功確認は「サインアウト」ボタンの可視で行う。
+    // SignInScreen (ログイン前) にも「Cocco RAG」見出しがあるため heading での判定は誤通過する。
+    // サインアウトボタンは web/app/page.tsx 側 (ログイン後 UI) にしか存在せず、
+    // signIn 完了 → useAuthenticator の route が 'authenticated' に切り替わってから描画される。
+    // Amplify が JWT を取得して再描画するまで数秒かかることがあるため timeout を長めにとる。
     await expect(
-        page.getByRole('heading', { name: /Cocco RAG/i }),
+        page.getByRole('button', { name: /サインアウト/ }),
     ).toBeVisible({ timeout: 20_000 });
 
     await page.context().storageState({ path: authFile });

@@ -197,13 +197,33 @@ KB 拡充の経路 [3] の出口。Phase 1 (`topScore` の DDB 保存) は PR #2
 
 | Phase | 範囲 | PR | 状態 |
 |---|---|---|---|
-| Phase 1 | バックエンド: `defineAuth` に webAuthn 追加 + Cognito Essentials ティア化 | PR1 (`feature/passkey-backend`) | 未着手 |
-| Phase 2 | フロント: サイドバーに「パスキー管理」ボタン → モーダルで登録/一覧/削除 | PR2 (`feature/passkey-frontend`) | 未着手 |
+| Phase 1 | バックエンド: `defineAuth` に webAuthn 追加 + Cognito Essentials ティア化 | PR #54 (`feature/passkey-backend`) | 完了 (2026-05-17) |
+| Phase 2 | フロント: サイドバーに「パスキー管理」ボタン → モーダルで登録/一覧/削除 | PR #55 (`feature/passkey-frontend`) | 完了 (2026-05-18 未明) |
+| **Phase 3** | **フロント: 自前ログイン画面に差し替え、メアド + パスキー優先 UX (パスワード認証はフォールバックとして残す)** | **PR3 (`feature/passkey-signin-screen`)** | **未着手 (2026-05-18 起案)** |
 | (将来) | `loginWith` から email を外しパスキーのみに切替 | 別PR | 家族全員登録完了後に判断 |
 
-### Phase 3 (ログイン画面改造) を実施しない理由
+### Phase 3 方針見直し (2026-05-18)
 
-「ログイン画面に『パスキーでサインイン』ボタンを並列表示する」案は今回スコープ外。家族 5〜10 人全員がパスキー登録を完了するまでは email/password ログインを使い続け、完了後に一気にパスキー専用 (将来 PR) に切り替える方がシンプル。「2つのログイン方法が並ぶ画面」を経由する期間を作らない。
+当初は「Phase 3 (ログイン画面改造) はスキップ、家族全員パスキー登録完了後に一気にパスキー専用へ移行する」方針だった (旧 §「Phase 3 を実施しない理由」)。しかし Phase 2 完了後にてつてつが本番で実機検証した結果、Amplify UI Authenticator v6.15 の WebAuthn 対応が **2 段階フロー** (画面 1: メアド+パスワード入力 → 画面 2: パスワード再入力 or 「パスキーでサインイン」選択) で固定されており、**パスキー登録後もメアド + パスワード + 生体認証の三重入力 UX** が発生することが判明した。これはパスキー本来の利便性 (= メアドだけ覚えてあとは生体認証) を完全に殺しており、当初判断が「ログイン体験の悪さ」を過小評価していたと結論。
+
+そこで Phase 3 を **「自前ログイン画面 (パスキー優先 + パスワード認証フォールバック)」** として実装する方針に切り替える。「2つのログイン方法が並ぶ画面を経由する期間を作らない」という旧方針は撤回。フォールバック導線を残す理由は、家族全員のパスキー登録完了タイミングが揃わないため、未登録者を締め出さないこと。
+
+### Phase 3 の実装方針 (2026-05-18 確定)
+
+- **採用 API**: `signIn({ username, options: { authFlowType: 'USER_AUTH', preferredChallenge: 'WEB_AUTHN' } })` (aws-amplify v6 正式サポート、`nextStep.signInStep === 'DONE'` で `confirmSignIn` 不要)
+- **画面構成**: ログイン画面は 1 枚。メアド入力 → 「🔑 パスキーでサインイン」ボタン (メイン) → ブラウザの生体認証ダイアログ。下部に「パスワードでサインイン」リンク (押すと同画面にパスワード入力欄を展開)
+- **構造**: 既存 `<Authenticator hideSignUp>` を廃し、`<Authenticator.Provider>` で children をラップ。`useAuthenticator()` の `route === 'authenticated'` で未認証なら自前 `<SignInScreen>` を表示、認証済みなら既存 children を表示
+- **既存資産の再利用**: `web/app/page.tsx` / `web/app/insights/page.tsx` の `useAuthenticator((ctx)=>[ctx.user])` および `<PasskeyManagementModal>` は無修正で動作 (Provider 経由で context は維持)
+- **i18n**: 旧「Sign In with Password」「Sign In with Passkey」翻訳 (Authenticator 用) は使われなくなるため整理。新ラベルは自前画面に日本語で直接記述
+- **テスト**: Vitest で `<SignInScreen>` のレンダリングと signIn 呼び出し引数を検証、Playwright `auth.setup.ts` を新画面に追従 (パスワード fallback リンクを開いてからメアド + パスワード入力)
+- **既知の制約**: WebAuthn 非対応ブラウザ (古い iOS Safari など) では「🔑 パスキーでサインイン」を押した直後の `signIn` がエラーを返す。エラーメッセージ上でパスワード方式へ誘導
+- **本番反映フロー**: バックエンド変更なし (Phase 1 のまま) のため、CDK 再デプロイ・`AMPLIFY_OUTPUTS_GZ_B64` 同期は **不要**。フロントのみの差分で Hosting 自動ビルドが反映する
+
+### 当初 (撤回済み) Phase 3 不実施判断 (2026-05-17 → 2026-05-18 撤回)
+
+> 「ログイン画面に『パスキーでサインイン』ボタンを並列表示する」案は今回スコープ外。家族 5〜10 人全員がパスキー登録を完了するまでは email/password ログインを使い続け、完了後に一気にパスキー専用 (将来 PR) に切り替える方がシンプル。「2つのログイン方法が並ぶ画面」を経由する期間を作らない。
+
+→ 上記は実機検証で UX 悪化が確認されたため撤回。Phase 3 を実施する方針に変更。
 
 ### Phase 2 の UI 配置 (2026-05-17 確定)
 
@@ -217,4 +237,3 @@ KB 拡充の経路 [3] の出口。Phase 1 (`topScore` の DDB 保存) は PR #2
 
 - パスキー必須化 (email/password 撤去) → 家族全員登録完了後、Issue #32 と合わせ技
 - カスタムドメイン化 → 現時点では amplifyapp.com で割り切る
-- ログイン画面側のパスキーログインボタン (Phase 3) → 上記理由でスキップ

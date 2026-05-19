@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-18 未明 (Phase 2 パスキーフロント PR #55 main マージ → Amplify Hosting ビルド Job #42 SUCCEED 確認済み。Codex (codex:codex-rescue) 初委譲で `PasskeyManagementModal.tsx` + サイドバー導線 + i18n 5 件追加 + Vitest 3 件 + Playwright 1 件を一括実装。Vitest 48 件 / E2E 10 件全 pass。`auth.setup.ts` を i18n 翻訳追加に追従させ「Sign In with Password|パスワードでサインイン」OR regex 両対応化。Codex 委譲の学びは ~/.claude/CLAUDE.md と個人メモリ feedback_codex_delegation_protocol / playwright_parallel_test_results_collision / i18n_breaks_e2e_locator / reference_codex_companion_path に格納。Issue #53 (Phase 1+2) クローズ可、残るは てつてつ実機目視 (PC Chrome + スマホ Safari) と家族への周知。次回は将来 PR (家族全員パスキー登録完了後に `loginWith.email` 撤去、Issue #32 と合わせ技) か他 Issue 着手。前回: 同日 Phase 1 PR #54 main マージ → Amplify Hosting ビルド Job #40 SUCCEED)
+最終更新: 2026-05-18 (Phase 3 起案: てつてつ実機検証で Amplify UI Authenticator v6.15 の WebAuthn 対応が 2 段階フロー固定 = 「メアド + パスワード + 生体認証」の三重入力 UX になっていると判明。当初の「Phase 3 はスキップして家族全員登録完了後に一気にパスキー専用へ移行」方針を撤回し、Phase 3 を「自前ログイン画面 (パスキー優先 + パスワード認証フォールバック)」として実装する方針に変更。aws-amplify v6 公式 docs で `signIn({ username, options: { authFlowType: 'USER_AUTH', preferredChallenge: 'WEB_AUTHN' } })` の正式サポートと、`<Authenticator.Provider>` で `useAuthenticator` フックを温存できることを確認済み。改修対象は `web/app/layout.tsx` + `web/app/AuthenticatorWrapper.tsx` (置換) + i18n 整理 + テスト類のみ、既存 `<PasskeyManagementModal>` とログイン後画面は無修正で済む。バックエンド変更なしのためデプロイは Hosting 自動ビルド経由で `AMPLIFY_OUTPUTS_GZ_B64` 同期は不要。次回はてつてつのレビュー → 理解度テスト → Codex 委譲で実装着手。前回: 同日 未明 Phase 2 パスキーフロント PR #55 main マージ → Amplify Hosting ビルド Job #42 SUCCEED)
 
 ### 次回セッション開始時にやること
 
@@ -259,6 +259,22 @@ CDK拡張 (`amplify/infra/knowledge-base.ts`) で全リソース定義。
   - md (768px) 以上で常時表示、未満で fixed + transform でスライド出し入れ
   - 左上にハンバーガーボタン (☰)、背景オーバーレイ (z-30, bg-black/50) でタップ閉じ
   - スレッド選択・新規会話ボタンタップで自動でサイドバーを閉じる UX
+
+### パスキー認証 Phase 3 (2026-05-18 起案、PR3 `feature/passkey-signin-screen` 予定)
+
+詳細方針は `plan.md` の「Phase 3 の実装方針」参照。
+
+- [ ] `web/app/SignInScreen.tsx` 新規作成 (メアド入力 + 「🔑 パスキーでサインイン」ボタン + 「パスワードでサインイン」フォールバックリンク → 同画面でパスワードフォーム展開)
+- [ ] `web/app/AuthenticatorWrapper.tsx` 改修: `<Authenticator hideSignUp>` を `<Authenticator.Provider>` + `useAuthenticator((ctx)=>[ctx.route])` で route 分岐 (`authenticated` 以外なら `<SignInScreen>`、authenticated なら children)
+- [ ] `web/app/ConfigureAmplifyClientSide.tsx` の i18n から旧 Authenticator 文言 (`Sign In with Password` / `Sign In with Passkey` / `Sign In` / `Sign in` / `Sign in to your account` / `Email` / `Password` / `Forgot your password?` 等で自前画面不使用になるもの) を整理。`Add passkey` `Passkey` `WebAuthn is not supported on this device` 等の PasskeyManagementModal 用は残す
+- [ ] パスキーサインイン: `signIn({ username: email, options: { authFlowType: 'USER_AUTH', preferredChallenge: 'WEB_AUTHN' } })` を呼び、`nextStep.signInStep === 'DONE'` を確認
+- [ ] エラーハンドリング: WebAuthn 非対応 / `UserCancelledException` / Cognito 例外を UI で吸収し「パスワードでサインイン」へ誘導
+- [ ] パスワード fallback: 同画面で `signIn({ username, password, options: { authFlowType: 'USER_AUTH' } })` を呼ぶ (preferredChallenge 指定なし)
+- [ ] Vitest: `SignInScreen` のレンダリング + メアド入力 + パスキーボタン押下時に `signIn` が指定引数で呼ばれること (`aws-amplify/auth` は `vi.mock`)
+- [ ] Playwright `web/tests/auth.setup.ts` 改修: 自前ログイン画面の操作に追従 (パスワード fallback リンクをクリックしてからメアド・パスワード入力)
+- [ ] Playwright `web/tests/passkey.spec.ts` 既存 (サイドバー → モーダル開閉) は無修正で pass することを確認
+- [ ] PR 作成前に Vitest / E2E 全 pass、てつてつのレビュー + 実機目視 (PC Chrome + スマホ Safari でパスキー初回ログイン体験)
+- [ ] 本番反映後、家族への新ログイン画面の周知 (LINE 等)
 
 ## Step 6: 家族ナレッジ追加機能（Phase 1.5、KB拡充の経路 [2]）
 
