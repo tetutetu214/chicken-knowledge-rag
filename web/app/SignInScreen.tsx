@@ -20,6 +20,30 @@ const WEBAUTHN_UNSUPPORTED_ERROR_NAMES = new Set([
     'NotAllowedError',
 ]);
 
+// Amplify SDK の @aws-amplify/auth が投げる PasskeyError の name 別メッセージ。
+// 標準の UserCancelledException 判定ではすり抜けるため、独自にマッピング。
+// 「Passkey authentication ceremony has been canceled」のような生英語が
+// ユーザーに見えないようにする。
+export const PASSKEY_ERROR_MESSAGES: Record<string, string> = {
+    PasskeyAuthenticationCanceled:
+        'パスキー認証が完了しませんでした。'
+        + 'iPhone Safari など一部の端末では QR コード認証フローが出ますが、'
+        + '下の「パスワードでサインイン」を使うのが確実です。',
+    PasskeyOperationAborted:
+        'パスキー認証が中断されました。'
+        + '下の「パスワードでサインイン」をお使いください。',
+    PasskeyRetrievalFailed:
+        'このデバイスではパスキーが取得できませんでした。'
+        + '下の「パスワードでサインイン」をお使いください。',
+    PasskeyNotSupported: PASSKEY_UNSUPPORTED_MESSAGE,
+    RelyingPartyMismatch:
+        'ドメイン設定の不一致でパスキーが使えません。'
+        + '管理者にお問い合わせください。',
+    InvalidPasskeyAuthenticationOptions:
+        'パスキー認証設定に問題があります。'
+        + '下の「パスワードでサインイン」をお使いください。',
+};
+
 export function isUserCancelledException(error: unknown): boolean {
     return error instanceof Error && error.name === 'UserCancelledException';
 }
@@ -29,6 +53,11 @@ export function isWebAuthnUnsupportedError(error: unknown): boolean {
         error instanceof Error
         && WEBAUTHN_UNSUPPORTED_ERROR_NAMES.has(error.name)
     );
+}
+
+export function getPasskeyErrorMessage(error: unknown): string | null {
+    if (!(error instanceof Error)) return null;
+    return PASSKEY_ERROR_MESSAGES[error.name] ?? null;
 }
 
 export function toErrorMessage(error: unknown): string {
@@ -110,6 +139,14 @@ export default function SignInScreen({
             handleSignInResult(result.nextStep.signInStep);
         } catch (error: unknown) {
             if (isUserCancelledException(error)) {
+                return;
+            }
+            // Amplify SDK の PasskeyError 系を先に判定する。
+            // (PasskeyAuthenticationCanceled は WEBAUTHN_UNSUPPORTED_ERROR_NAMES
+            // と重ならず、より具体的なメッセージを出せる)
+            const passkeyErrorMessage = getPasskeyErrorMessage(error);
+            if (passkeyErrorMessage) {
+                setErrorMessage(passkeyErrorMessage);
                 return;
             }
             if (isWebAuthnUnsupportedError(error)) {

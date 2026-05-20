@@ -602,13 +602,23 @@ export default function Home() {
                             })}
                     </div>
                 </div>
-                <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
+                <div
+                    className={[
+                        'p-3 border-t border-zinc-200 dark:border-zinc-800',
+                        'text-xs text-zinc-500 dark:text-zinc-400',
+                        // iPhone Safari / Chrome のボトムツールバー (戻る/進む/タブ/メニュー
+                        // = 約 56pt) と画面下端のセーフエリアを確保しないと、左ペイン下端の
+                        // サインアウトボタンがブラウザ UI に覆われてタップできない。
+                        // モバイル幅 (md 未満) のときだけ余白を増やす。
+                        'pb-[calc(env(safe-area-inset-bottom)+4rem)] md:pb-3',
+                    ].join(' ')}
+                >
                     <div className="truncate mb-1">
                         {user?.signInDetails?.loginId ?? user?.username}
                     </div>
                     <button
                         onClick={signOut}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-blue-600 dark:text-blue-400 hover:underline min-h-11"
                     >
                         サインアウト
                     </button>

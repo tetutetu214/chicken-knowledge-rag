@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signIn } from 'aws-amplify/auth';
 import SignInScreen, {
+    PASSKEY_ERROR_MESSAGES,
+    getPasskeyErrorMessage,
     signInWithPasskey,
     signInWithPassword,
 } from './SignInScreen';
@@ -48,6 +50,26 @@ describe('SignInScreen', () => {
         expect(html).not.toContain('aria-label="パスワード"');
         expect(expandedHtml).toContain('aria-label="パスワード"');
         expect(expandedHtml).toContain('type="password"');
+    });
+
+    it('PasskeyError の name で日本語メッセージにマッピングできる', () => {
+        // Amplify SDK の PasskeyError は Error を継承し name に
+        // "PasskeyAuthenticationCanceled" 等のコードを持つ。
+        const cancelled = new Error('Passkey authentication ceremony has been canceled.');
+        cancelled.name = 'PasskeyAuthenticationCanceled';
+        expect(getPasskeyErrorMessage(cancelled)).toBe(
+            PASSKEY_ERROR_MESSAGES.PasskeyAuthenticationCanceled,
+        );
+
+        const aborted = new Error('aborted');
+        aborted.name = 'PasskeyOperationAborted';
+        expect(getPasskeyErrorMessage(aborted)).toBe(
+            PASSKEY_ERROR_MESSAGES.PasskeyOperationAborted,
+        );
+
+        const unknown = new Error('something else');
+        unknown.name = 'TotallyUnknownError';
+        expect(getPasskeyErrorMessage(unknown)).toBeNull();
     });
 
     it('パスワード送信時は preferredChallenge: PASSWORD_SRP で signIn を呼ぶ', async () => {
