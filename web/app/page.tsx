@@ -422,6 +422,21 @@ export default function Home() {
             >
                 ☰
             </button>
+            {/*
+              スマホ用: サインアウトボタン (md未満で表示)。
+              左ペイン下部のサインアウトは fixed なサイドバー内にあり、
+              iPhone Safari / Chrome の下部ブラウザ UI に被ってタップ
+              できない問題があるため、画面右上にも常時表示する。
+              ハンバーガーボタン(左上)と対称位置に置く。
+            */}
+            <button
+                type="button"
+                onClick={signOut}
+                className="md:hidden fixed top-3 right-3 z-40 px-3 py-2 bg-white dark:bg-zinc-800 rounded-md shadow border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-200 min-h-11"
+                aria-label="サインアウト"
+            >
+                サインアウト
+            </button>
             {/* スマホ用: サイドバー展開時の背景オーバーレイ。タップで閉じる */}
             {sidebarOpen && (
                 <div
