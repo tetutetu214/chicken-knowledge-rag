@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-23 (Issue #34 (Amplify Hosting 環境変数展開フローを npm script に集約) を「主要部分実装済み」でクローズし、残作業 (Run Book + CDK コメント補強) を Issue #33 に統合。調査の結果、改善案 ① npm script 集約は PR #49 (2026-05-16 世代ズレ事故対策) で既に等価実装 (`npm run sandbox` + `scripts/sync-outputs-env.mjs`) されており、起票時前提が解消済みと判明。Issue #33 のスコープは「removalPolicy 明示 + Bedrock KB 再作成 SOP + Amplify Hosting 反映フロー Run Book + hosting.ts コメント補強」に拡大。前回: #29 (DDB expiresAt) を「起票時前提解消済み」でクローズ。次は #31 (SCORE_THRESHOLD / EMBEDDING_MODEL_ID の env 化) を予定 (推奨着手順: #31 → #32 → #33 → #30))
+最終更新: 2026-05-23 (**月額予算上限を $30 → $15 に引き下げ** — Cost Explorer 実測で chicken-rag の月コストが Sonnet/Haiku 中心で実績 $4.96 / forecast $6 (非LLMサービスは全て事実上 $0) と判明、$30 予算は実態の約 6 倍に過剰見積もりだったため。AWS Budgets `chicken-knowledge-rag-monthly` の上限を CLI で更新済み、通知 50%/80%/100% とハードストップ Action は PERCENTAGE 設定なので自動連動。CLAUDE.md の予算記述も更新。詳細は knowledge.md 2026-05-23 参照。並行して Issue #34 (Amplify Hosting 環境変数展開フロー) を「主要部分実装済み」でクローズし、残作業 (Run Book + CDK コメント補強) を Issue #33 に統合。次は #31 (SCORE_THRESHOLD / EMBEDDING_MODEL_ID の env 化) を予定 (推奨着手順: #31 → #32 → #33 → #30))
 
 ### 次回セッション開始時にやること
 
