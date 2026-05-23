@@ -49,6 +49,18 @@ const backend = defineBackend({
     summarizeHandler,
 });
 
+// === Cognito User Pool sign-up を CDK で明示的に閉じる (Issue #32) ===
+// フロントの <Authenticator hideSignUp> は UI 上の隠蔽のみで、Cognito の SignUp API を
+// 直接叩く経路は塞がない。家族プライベートシステム (CLAUDE.md「家族のみが利用」) の
+// 設計意図に合わせ、IaC で明示的に allowAdminCreateUserOnly = true にする。
+// 家族追加時は AWS Console / CLI の admin-create-user を使う運用。
+// Amplify Gen2 v1.22 時点で defineAuth に公式オプションがないため escape hatch で設定。
+const cfnUserPool = backend.auth.resources.cfnResources.cfnUserPool;
+cfnUserPool.adminCreateUserConfig = {
+    allowAdminCreateUserOnly: true,
+    unusedAccountValidityDays: 7, // 招待コード有効期限 (Cognito デフォルト維持)
+};
+
 // CDK 拡張: IAM / Budget 等のインフラリソースを同じ Stack に追加
 const infraStack = backend.createStack('ChickenRagInfra');
 
