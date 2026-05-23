@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-23 (Issue #28 (Bedrock IAM 最小権限) を `feature/issue-28-bedrock-iam-least-privilege` で完了。`amplify/infra/iam.ts` に `grantNovaProInvoke` / `grantTitanEmbedInvoke` / `grantKbRetrieve` の 3 ヘルパーを追加し、`backend.ts` と `evaluation.ts` の重複した PolicyStatement を集約。Bedrock InvokeModel の resource を `foundation-model/*` → APAC Nova Pro Inference Profile + 配下 6 リージョン FM の特定 ARN リストに、KB Retrieve を `knowledge-base/*` → 特定 KB ID に絞った。`npm run sandbox` で 140 秒 UPDATE_COMPLETE、3 Lambda の DefaultPolicy のみが更新され Lambda 本体・KB・DynamoDB の置換なし。chat-handler を `aws lambda invoke` で実機テストし `kbHit=true, topScore=0.738` で AccessDeniedException なし正常応答を確認。詳細は knowledge.md 2026-05-23 参照。次は #29 (DDB expiresAt サーバー強制計算) を予定。前回: Phase 3 (PR #56) 後の iPhone UX 修正 2 PR (#57, #58) で Issue #53 完全クローズ)
+最終更新: 2026-05-23 (Issue #29 (DDB expiresAt サーバー強制計算) を「起票時前提解消済み」でクローズ。2026-05-10 のアーカイブ刷新 (PR #45) で Conversation/Message 作成時の `expiresAt` フロント計算 3 箇所が全撤去され、残るは「ゴミ箱送り操作」の 1 箇所のみ。その 1 箇所も `web/app/lib/ttl.ts` の `archiveExpiresAt()` に集約済みで、90 日定数の散布は解消済み。家族プライベート運用 (Cognito 必須 + 家族のみ) では Lambda 強制計算 (1〜1.5 日 + IAM + E2E 修正) は釣り合わないと判断。将来 untrusted client が出てきたら再起票。前回: #28 (Bedrock IAM 最小権限) 完了、3 Lambda の DefaultPolicy のみ更新で UPDATE_COMPLETE 140 秒。次は #34 (Amplify Hosting 環境変数展開フローの npm script 集約) を予定 (推奨着手順: #34 → #31 → #32 → #33 → #30))
 
 ### 次回セッション開始時にやること
 
@@ -40,14 +40,14 @@
 | Priority | Issue | タイトル | 観点 | 関連ファイル |
 |---|---|---|---|---|
 | ~~P1~~ | ~~#28~~ | ~~Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化~~ — **2026-05-23 完了** (`feature/issue-28-bedrock-iam-least-privilege`、knowledge.md 2026-05-23 参照) | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
-| **P1** | **#29** | DynamoDB `expiresAt` をバックエンドで強制計算 | 信頼性 | `functions/chat-handler/`, `functions/summarize-handler/` |
+| ~~P1~~ | ~~#29~~ | ~~DynamoDB `expiresAt` をバックエンドで強制計算~~ — **2026-05-23 「起票時前提解消済み」でクローズ** (PR #45 アーカイブ刷新でフロント書き込み 3 箇所が撤去済み。残るゴミ箱送り 1 箇所は `web/app/lib/ttl.ts` に集約済みで家族運用では実害なし。knowledge.md 2026-05-23 参照) | 信頼性 | `web/app/lib/ttl.ts`, `web/app/page.tsx` |
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
 | **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残)。**派生**: 0.62〜0.69 帯の語彙ギャップで取りこぼす質問への根本対応として Nova Pro による同義語クエリ拡張を `feature/query-expansion-issue-31` で別 PR 化予定 (2026-05-10) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
 | **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
 | **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 | 信頼性 | `infra/knowledge-base.ts`, 新規 `docs/operations.md` |
 | **P3** | **#34** | Amplify Hosting 環境変数展開フローを npm script に集約 | 保守性 | `package.json`, 新規 `scripts/pack-outputs.mjs` |
 
-着手順の推奨: #28 → #29 (P1 セキュリティ・信頼性を先に潰す) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
+着手順の推奨: ~~#28~~ (2026-05-23 完了) → ~~#29~~ (2026-05-23 クローズ、前提解消済み) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
 直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定、目視 QA OK、Ragas Run `run_20260508_152801` faith 0.65 / ar 0.39 / cp 0.64 / cr 0.20 ※judge も Nova Pro のため self-eval bias 大、参考値扱い) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
