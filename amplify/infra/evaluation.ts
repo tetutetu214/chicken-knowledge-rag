@@ -19,6 +19,11 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
+import {
+    grantKbRetrieve,
+    grantNovaProInvoke,
+    grantTitanEmbedInvoke,
+} from './iam';
 
 // ESM では __dirname が無いので import.meta.url から導出する
 const __filename = fileURLToPath(import.meta.url);
@@ -121,34 +126,17 @@ export const createEvaluationPipeline = (
     );
 
     // Bedrock KB Retrieve 権限 (chat-handler と並行 Retrieve するため)
-    evaluationLambda.addToRolePolicy(
-        new iam.PolicyStatement({
-            sid: 'BedrockKbRetrieve',
-            actions: ['bedrock:Retrieve'],
-            resources: [
-                `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`,
-            ],
-        }),
-    );
+    grantKbRetrieve(evaluationLambda.role!, {
+        region,
+        accountId,
+        knowledgeBaseId: props.knowledgeBaseId,
+    });
 
-    // Bedrock InvokeModel 権限 (Ragas のジャッジ LLM = Sonnet 4.6 / Embedding = Titan V2)
-    // Inference Profile 経由のため Foundation Model ARN もカバー (chat-handler と同パターン)
-    evaluationLambda.addToRolePolicy(
-        new iam.PolicyStatement({
-            sid: 'BedrockInvokeForRagas',
-            actions: [
-                'bedrock:InvokeModel',
-                'bedrock:GetInferenceProfile',
-                'bedrock:UseInferenceProfile',
-            ],
-            resources: [
-                `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
-                `arn:aws:bedrock:${region}::foundation-model/*`,
-                'arn:aws:bedrock:*::foundation-model/*',
-                'arn:aws:bedrock:::foundation-model/*',
-            ],
-        }),
-    );
+    // Ragas のジャッジ LLM = APAC Nova Pro (Inference Profile)
+    // Embedding = Titan V2 (Foundation Model 直接、ap-northeast-1 のみ)
+    // chat-handler と同じ Nova Pro 権限 + Titan 用の追加権限
+    grantNovaProInvoke(evaluationLambda.role!, { region, accountId });
+    grantTitanEmbedInvoke(evaluationLambda.role!, { region });
 
     // 5. EventBridge Scheduler (月次自動実行)
     // 毎月1日 09:00 JST。Scheduler は cron(分 時 日 月 曜日 年) 形式で

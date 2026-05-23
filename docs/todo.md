@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-21 (Phase 3 (PR #56) 後に発覚した iPhone UX 問題 2 件を PR #57 (PasskeyError 日本語化 + 左ペイン下部 safe-area) と PR #58 (スマホ用画面右上サインアウトボタン) で連続修正・本番反映完了。最終確認結果: PC Chrome ではパスキー登録・サインインとも安定動作、iPhone Safari でもパスキー登録・サインインが動作 (時折失敗するが許容範囲)、iPhone Chrome はパスキー認証時に QR コード Hybrid Transport が強制される (Chrome の iOS 実装と iCloud Keychain 連携の制約)。スマホ全体のサインアウトは画面右上の fixed ボタンで確実に押せる構成に。家族向け運用ガイダンス: 「iPhone は Safari 推奨、PC は Chrome/Edge どれでも OK、パスキーが効かない端末/状況ではパスワードでサインインに fallback」。実装過程の核となる技術判断補正は 3 件 (knowledge.md 学習済み概念に格納済み): ①パスワード fallback は `preferredChallenge: 'PASSWORD_SRP'` を明示、②`useAuthenticator` は `route` ではなく `authStatus` を購読、③Amplify SDK の PasskeyError 系は標準の UserCancelledException 判定をすり抜けるため独自マッピングが必要。残課題は最終確定で: (a) iPhone Safari で時折出る「ceremony canceled」の原因は未深掘り (許容)、(b) Android 端末でのパスキー動作未検証 (家族から要望出たら対応)。Issue #53 パスキー 3 Phase + UX 修正 2 PR、計 5 PR で完全クローズ。次回は他 Issue 着手 (#28 IAM 最小権限、#29 DDB expiresAt 強制計算 など)。前回: PR #56 main マージ → Amplify Hosting ビルド完了 → PC 動作確認済み)
+最終更新: 2026-05-23 (Issue #28 (Bedrock IAM 最小権限) を `feature/issue-28-bedrock-iam-least-privilege` で完了。`amplify/infra/iam.ts` に `grantNovaProInvoke` / `grantTitanEmbedInvoke` / `grantKbRetrieve` の 3 ヘルパーを追加し、`backend.ts` と `evaluation.ts` の重複した PolicyStatement を集約。Bedrock InvokeModel の resource を `foundation-model/*` → APAC Nova Pro Inference Profile + 配下 6 リージョン FM の特定 ARN リストに、KB Retrieve を `knowledge-base/*` → 特定 KB ID に絞った。`npm run sandbox` で 140 秒 UPDATE_COMPLETE、3 Lambda の DefaultPolicy のみが更新され Lambda 本体・KB・DynamoDB の置換なし。chat-handler を `aws lambda invoke` で実機テストし `kbHit=true, topScore=0.738` で AccessDeniedException なし正常応答を確認。詳細は knowledge.md 2026-05-23 参照。次は #29 (DDB expiresAt サーバー強制計算) を予定。前回: Phase 3 (PR #56) 後の iPhone UX 修正 2 PR (#57, #58) で Issue #53 完全クローズ)
 
 ### 次回セッション開始時にやること
 
@@ -39,7 +39,7 @@
 
 | Priority | Issue | タイトル | 観点 | 関連ファイル |
 |---|---|---|---|---|
-| **P1** | **#28** | Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化 | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
+| ~~P1~~ | ~~#28~~ | ~~Bedrock IAM 権限を最小権限に絞り、3 ロールで共通ヘルパー化~~ — **2026-05-23 完了** (`feature/issue-28-bedrock-iam-least-privilege`、knowledge.md 2026-05-23 参照) | セキュリティ | `backend.ts`, `infra/iam.ts`, `infra/evaluation.ts` |
 | **P1** | **#29** | DynamoDB `expiresAt` をバックエンドで強制計算 | 信頼性 | `functions/chat-handler/`, `functions/summarize-handler/` |
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
 | **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残)。**派生**: 0.62〜0.69 帯の語彙ギャップで取りこぼす質問への根本対応として Nova Pro による同義語クエリ拡張を `feature/query-expansion-issue-31` で別 PR 化予定 (2026-05-10) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |

@@ -1,12 +1,15 @@
 import * as cdk from 'aws-cdk-lib';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { chatHandler } from './functions/chat-handler/resource';
 import { summarizeHandler } from './functions/summarize-handler/resource';
-import { createIamResources } from './infra/iam';
+import {
+    createIamResources,
+    grantKbRetrieve,
+    grantNovaProInvoke,
+} from './infra/iam';
 import { createBudgetWithHardStop } from './infra/budget';
 import { createStorageResources } from './infra/storage';
 import { createKnowledgeBase } from './infra/knowledge-base';
@@ -79,28 +82,8 @@ const region = cdk.Stack.of(infraStack).region;
 const accountId = cdk.Stack.of(infraStack).account;
 const conversationModelId = 'apac.amazon.nova-pro-v1:0';
 
-// Bedrock 呼び出し権限を Lambda 実行ロールに付与する共通ヘルパ。
-// chat / summarize 両方が APAC Inference Profile 経由で Nova Pro を呼ぶため共有。
-const grantBedrockInvoke = (role: iam.IRole): void => {
-    role.addToPrincipalPolicy(
-        new iam.PolicyStatement({
-            sid: 'BedrockInferenceProfileInvoke',
-            actions: [
-                'bedrock:InvokeModel',
-                'bedrock:GetInferenceProfile',
-                'bedrock:UseInferenceProfile',
-            ],
-            resources: [
-                `arn:aws:bedrock:${region}:${accountId}:inference-profile/*`,
-                `arn:aws:bedrock:${region}::foundation-model/*`,
-                // CRIS は他リージョンの foundation-model も呼ぶため広めに許可
-                'arn:aws:bedrock:*::foundation-model/*',
-                // Global Inference Profile はリージョン部分が空の ARN も持つため明示追加
-                'arn:aws:bedrock:::foundation-model/*',
-            ],
-        }),
-    );
-};
+// Bedrock 呼び出し権限の付与は `amplify/infra/iam.ts` の grantNovaProInvoke /
+// grantKbRetrieve ヘルパーに集約 (Issue #28、3 Lambda で同一定義を再利用するため)。
 
 // === chat Lambda ===
 const chatLambda = backend.chatHandler.resources.lambda as lambda.Function;
@@ -120,16 +103,12 @@ if (!chatLambdaRole) {
     throw new Error('chatHandler の Lambda 実行ロールが未生成');
 }
 
-chatLambdaRole.addToPrincipalPolicy(
-    new iam.PolicyStatement({
-        sid: 'BedrockKnowledgeBaseQuery',
-        actions: ['bedrock:Retrieve'],
-        resources: [
-            `arn:aws:bedrock:${region}:${accountId}:knowledge-base/*`,
-        ],
-    }),
-);
-grantBedrockInvoke(chatLambdaRole);
+grantKbRetrieve(chatLambdaRole, {
+    region,
+    accountId,
+    knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+});
+grantNovaProInvoke(chatLambdaRole, { region, accountId });
 
 // chat Lambda が KB 作成後に呼び出せるよう依存関係を追加
 chatLambda.node.addDependency(knowledgeBase);
@@ -142,7 +121,7 @@ const summarizeLambdaRole = summarizeLambda.role;
 if (!summarizeLambdaRole) {
     throw new Error('summarizeHandler の Lambda 実行ロールが未生成');
 }
-grantBedrockInvoke(summarizeLambdaRole);
+grantNovaProInvoke(summarizeLambdaRole, { region, accountId });
 
 // === Ragas 評価パイプライン (Issue #17) ===
 // chat-handler を直接 invoke して本番一致の応答を測る (案 C、knowledge.md 参照)。
