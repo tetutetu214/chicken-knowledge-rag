@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-23 (Issue #29 (DDB expiresAt サーバー強制計算) を「起票時前提解消済み」でクローズ。2026-05-10 のアーカイブ刷新 (PR #45) で Conversation/Message 作成時の `expiresAt` フロント計算 3 箇所が全撤去され、残るは「ゴミ箱送り操作」の 1 箇所のみ。その 1 箇所も `web/app/lib/ttl.ts` の `archiveExpiresAt()` に集約済みで、90 日定数の散布は解消済み。家族プライベート運用 (Cognito 必須 + 家族のみ) では Lambda 強制計算 (1〜1.5 日 + IAM + E2E 修正) は釣り合わないと判断。将来 untrusted client が出てきたら再起票。前回: #28 (Bedrock IAM 最小権限) 完了、3 Lambda の DefaultPolicy のみ更新で UPDATE_COMPLETE 140 秒。次は #34 (Amplify Hosting 環境変数展開フローの npm script 集約) を予定 (推奨着手順: #34 → #31 → #32 → #33 → #30))
+最終更新: 2026-05-23 (Issue #34 (Amplify Hosting 環境変数展開フローを npm script に集約) を「主要部分実装済み」でクローズし、残作業 (Run Book + CDK コメント補強) を Issue #33 に統合。調査の結果、改善案 ① npm script 集約は PR #49 (2026-05-16 世代ズレ事故対策) で既に等価実装 (`npm run sandbox` + `scripts/sync-outputs-env.mjs`) されており、起票時前提が解消済みと判明。Issue #33 のスコープは「removalPolicy 明示 + Bedrock KB 再作成 SOP + Amplify Hosting 反映フロー Run Book + hosting.ts コメント補強」に拡大。前回: #29 (DDB expiresAt) を「起票時前提解消済み」でクローズ。次は #31 (SCORE_THRESHOLD / EMBEDDING_MODEL_ID の env 化) を予定 (推奨着手順: #31 → #32 → #33 → #30))
 
 ### 次回セッション開始時にやること
 
@@ -44,10 +44,10 @@
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
 | **P2** | **#31** | 設定値の環境変数化 (chat-handler の SCORE_THRESHOLD は 2026-05-08 完了、EMBEDDING_MODEL_ID と summarize-handler 側は残)。**派生**: 0.62〜0.69 帯の語彙ギャップで取りこぼす質問への根本対応として Nova Pro による同義語クエリ拡張を `feature/query-expansion-issue-31` で別 PR 化予定 (2026-05-10) | 保守性 | `functions/chat-handler/handler.ts`, `infra/knowledge-base.ts` |
 | **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
-| **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 | 信頼性 | `infra/knowledge-base.ts`, 新規 `docs/operations.md` |
-| **P3** | **#34** | Amplify Hosting 環境変数展開フローを npm script に集約 | 保守性 | `package.json`, 新規 `scripts/pack-outputs.mjs` |
+| **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 + **Amplify Hosting 反映フロー Run Book** + **hosting.ts コメント補強** (2026-05-23 #34 から統合) | 信頼性 | `infra/knowledge-base.ts`, `amplify/infra/hosting.ts`, 新規 `docs/operations.md` |
+| ~~P3~~ | ~~#34~~ | ~~Amplify Hosting 環境変数展開フローを npm script に集約~~ — **2026-05-23 「主要部分実装済み」でクローズ** (npm script 集約は PR #49 で実装済み、`npm run sandbox` + `scripts/sync-outputs-env.mjs` が等価機能。残作業の Run Book + CDK コメント補強は #33 に統合。knowledge.md 2026-05-23 参照) | 保守性 | — |
 
-着手順の推奨: ~~#28~~ (2026-05-23 完了) → ~~#29~~ (2026-05-23 クローズ、前提解消済み) → #34 (#31/#32 の前に Hosting 反映フローを整備すると後続が楽) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
+着手順の推奨: ~~#28~~ (2026-05-23 完了) → ~~#29~~ (2026-05-23 クローズ、前提解消済み) → ~~#34~~ (2026-05-23 クローズ、PR #49 で実装済み + 残作業は #33 統合) → #31 → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
 直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定、目視 QA OK、Ragas Run `run_20260508_152801` faith 0.65 / ar 0.39 / cp 0.64 / cr 0.20 ※judge も Nova Pro のため self-eval bias 大、参考値扱い) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
