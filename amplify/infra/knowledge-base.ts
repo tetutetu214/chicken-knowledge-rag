@@ -17,15 +17,24 @@ import * as bedrock from 'aws-cdk-lib/aws-bedrock';
  *
  * 注意: チャンキング戦略はデータソース作成後に変更不可のため、初期設定が確定値。
  *
- * Embedding モデル: Titan Text Embeddings V2 (amazon.titan-embed-text-v2:0)
+ * Embedding モデル: 既定は Titan Text Embeddings V2 (amazon.titan-embed-text-v2:0)
  * - 1024次元、最大8192トークン、100+言語対応
  * - 別途 AWS コンソールで Bedrock モデルアクセス有効化が必要
+ * - モデル ID は `embeddingModelId` props で受け取る (Issue #31、~/.secrets/...env 経由)。
+ *   **変更すると Bedrock KB が CFn Replacement で再作成される** (= 既存ベクトル全消去 +
+ *   再 Ingestion 必要 + KB ID が変わるので Lambda env も更新必要)。気軽な切替ではなく
+ *   「移行操作の可視化」が目的。
  */
 export interface KnowledgeBaseProps {
     /** ドキュメント原本バケット (Bedrock KB のデータソース) */
     docsBucket: s3.Bucket;
     /** Bedrock KB が引き受けるサービスロール */
     kbServiceRole: iam.Role;
+    /**
+     * Bedrock Foundation Model ID (例: amazon.titan-embed-text-v2:0)。
+     * VectorIndex の dimension/dataType と整合させる必要あり。変更は KB 再作成を伴う。
+     */
+    embeddingModelId: string;
 }
 
 export interface KnowledgeBaseResources {
@@ -39,13 +48,13 @@ export const createKnowledgeBase = (
     scope: Construct,
     props: KnowledgeBaseProps,
 ): KnowledgeBaseResources => {
-    const { docsBucket, kbServiceRole } = props;
+    const { docsBucket, kbServiceRole, embeddingModelId } = props;
     const region = cdk.Stack.of(scope).region;
     const accountId = cdk.Stack.of(scope).account;
 
-    // Titan Text Embeddings V2 の Foundation Model ARN
+    // Embedding モデルの Foundation Model ARN (既定は Titan Text Embeddings V2)
     const embeddingModelArn =
-        `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`;
+        `arn:aws:bedrock:${region}::foundation-model/${embeddingModelId}`;
 
     // S3 Vectors VectorBucket (ベクトルデータ格納用)
     const vectorBucket = new s3vectors.CfnVectorBucket(scope, 'VectorBucket', {

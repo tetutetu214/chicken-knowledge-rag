@@ -31,19 +31,11 @@ import {
     parseHistory,
     sanitizeHistory,
 } from './history';
+import { requireEnv } from '../_shared/env';
 
-// 環境変数を必須として読み出す。未設定なら Lambda 初期化時に即例外で失敗させ、
-// silently 0 や空文字で処理が進む事故を防ぐ (Issue #31)。
-const requireEnv = (name: string): string => {
-    const value = process.env[name];
-    if (!value) {
-        throw new Error(`環境変数 ${name} が未設定`);
-    }
-    return value;
-};
-
-const KB_ID = process.env.KNOWLEDGE_BASE_ID ?? '';
-const MODEL_ID = process.env.MODEL_ID ?? '';
+// 環境変数は Lambda 初期化時に即 throw して silently 動く事故を防ぐ (Issue #31)。
+const KB_ID = requireEnv('KNOWLEDGE_BASE_ID');
+const MODEL_ID = requireEnv('MODEL_ID');
 const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 
 // KB ヒットありと判定する最低類似度スコア (cosine 0.0〜1.0)。
@@ -182,9 +174,7 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
     if (!question) {
         throw new Error('question is required');
     }
-    if (!KB_ID || !MODEL_ID) {
-        throw new Error('KNOWLEDGE_BASE_ID / MODEL_ID 環境変数が未設定');
-    }
+    // KB_ID / MODEL_ID は init-time に requireEnv で検証済み (Issue #31)。
 
     const history = sanitizeHistory(parseHistory(event.arguments.historyJson));
     const summary = (event.arguments.summary ?? '').trim();

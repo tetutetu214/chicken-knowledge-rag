@@ -37,6 +37,9 @@ const notificationEmail = requireEnv('NOTIFICATION_EMAIL');
 const budgetLimitUsd = parseInt(requireEnv('BUDGET_MONTHLY_LIMIT_USD'), 10);
 const hostingBranchName = requireEnv('HOSTING_BRANCH_NAME');
 const amplifyOutputsGzB64 = requireEnv('AMPLIFY_OUTPUTS_GZ_B64');
+// 既定 'amazon.titan-embed-text-v2:0'。変更は Bedrock KB の Replacement を伴うため
+// CFn diff で確認してから apply すること (Issue #31、knowledge-base.ts コメント参照)。
+const embeddingModelId = requireEnv('EMBEDDING_MODEL_ID');
 
 // Amplify Gen2 のベース定義 (auth: Cognito, data: AppSync + DynamoDB, functions: chat / summarize)
 const backend = defineBackend({
@@ -73,6 +76,7 @@ const { vectorBucket, vectorIndex, knowledgeBase, dataSource } =
     createKnowledgeBase(infraStack, {
         docsBucket,
         kbServiceRole,
+        embeddingModelId,
     });
 
 // 会話 API: AppSync Direct Lambda Resolver (Cognito 認証必須)

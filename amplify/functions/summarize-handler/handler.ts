@@ -12,8 +12,10 @@ import {
     BedrockRuntimeClient,
     ConverseCommand,
 } from '@aws-sdk/client-bedrock-runtime';
+import { requireEnv } from '../_shared/env';
 
-const MODEL_ID = process.env.MODEL_ID ?? '';
+// 環境変数は Lambda 初期化時に即 throw して silently 動く事故を防ぐ (Issue #31)。
+const MODEL_ID = requireEnv('MODEL_ID');
 const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 
 const runtimeClient = new BedrockRuntimeClient({ region: REGION });
@@ -47,9 +49,7 @@ interface RawMessage {
 export const handler = async (
     event: AppSyncEvent,
 ): Promise<SummarizeResponse> => {
-    if (!MODEL_ID) {
-        throw new Error('MODEL_ID 環境変数が未設定');
-    }
+    // MODEL_ID は init-time に requireEnv で検証済み (Issue #31)。
 
     const existing = (event.arguments.existingSummary ?? '').trim();
     const raw = event.arguments.messagesJson ?? '';
