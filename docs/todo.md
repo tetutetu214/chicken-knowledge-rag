@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-23 (Issue #31 完了 — PR #60 `feature/issue-31-env-cleanup` で `amplify/functions/_shared/env.ts` 新規 + chat/summarize handler を init-time throw に統一 + EMBEDDING_MODEL_ID を env 化。CFn 検証で KB は no-op (env デフォルト値完全一致のため CFn diff なし) を確認、Lambda 2 個のみ更新、sandbox apply 85 秒 UPDATE_COMPLETE、Amplify Hosting Job #53 SUCCEED。前回: 月額予算上限を $30 → $15 に引き下げ (Cost Explorer 実測 $5/月)、Issue #34 を主要部分実装済みでクローズして #33 にスコープ統合、Issue #29 を起票時前提解消済みでクローズ。次は #32 (Cognito sign-up 無効化を CDK で明示化) を予定 (推奨着手順: #32 → #33 → #30))
+最終更新: 2026-05-23 (Issue #32 完了 — PR #61 `feature/issue-32-cognito-signup-explicit` で CDK escape hatch を追加。実機調査で `AllowAdminCreateUserOnly=false` だったため (起票時前提と異なる)、`backend.auth.resources.cfnResources.cfnUserPool.adminCreateUserConfig.allowAdminCreateUserOnly = true` で明示化。sandbox apply 73 秒 UPDATE_COMPLETE、UserPool は UPDATE (Replacement ではない) で既存ユーザー保持、`describe-user-pool` で `AllowAdminCreateUserOnly: true` 反映確認。Hosting Job #55 進行中 (完了確認別途)。同日: #31 完了 (PR #60、env 化 + 共通ヘルパー)、予算 $30→$15 引き下げ、#34/#29 クローズ。次は #33 (Bedrock KB removalPolicy 明示 + Run Book + hosting.ts コメント補強の統合 Issue) を予定 (推奨着手順: #33 → #30))
 
 ### 次回セッション開始時にやること
 
@@ -43,11 +43,11 @@
 | ~~P1~~ | ~~#29~~ | ~~DynamoDB `expiresAt` をバックエンドで強制計算~~ — **2026-05-23 「起票時前提解消済み」でクローズ** (PR #45 アーカイブ刷新でフロント書き込み 3 箇所が撤去済み。残るゴミ箱送り 1 箇所は `web/app/lib/ttl.ts` に集約済みで家族運用では実害なし。knowledge.md 2026-05-23 参照) | 信頼性 | `web/app/lib/ttl.ts`, `web/app/page.tsx` |
 | **P2** | **#30** | Lambda リソース・CloudWatch Logs 保持の実測ベース最適化 | コスト・信頼性・観測性 | `functions/*/resource.ts`, `infra/evaluation.ts` |
 | ~~P2~~ | ~~#31~~ | ~~設定値の環境変数化~~ — **2026-05-23 完了** (PR #60 `feature/issue-31-env-cleanup`、knowledge.md 2026-05-23 参照)。`_shared/env.ts` 新規 + chat/summarize handler を init-time throw に統一 + EMBEDDING_MODEL_ID env 化 (KB は CFn no-op 確認)。**派生**: 0.62〜0.69 帯の語彙ギャップで取りこぼす質問への根本対応として Nova Pro による同義語クエリ拡張を `feature/query-expansion-issue-31` で別 PR 化予定 (2026-05-10) は残課題 | 保守性 | — |
-| **P2** | **#32** | Cognito sign-up 無効化を CDK で明示化 | セキュリティ | `auth/resource.ts`, `backend.ts` |
+| ~~P2~~ | ~~#32~~ | ~~Cognito sign-up 無効化を CDK で明示化~~ — **2026-05-23 完了** (PR #61 `feature/issue-32-cognito-signup-explicit`、knowledge.md 2026-05-23 参照)。起票時前提と異なり実機調査で `AllowAdminCreateUserOnly=false` だったため escape hatch で明示的に `true` 化。Cognito API 経由の sign-up を IaC レベルで遮断 | セキュリティ | — |
 | **P2** | **#33** | Bedrock KB / DataSource の removalPolicy 明示と再作成 SOP 整備 + **Amplify Hosting 反映フロー Run Book** + **hosting.ts コメント補強** (2026-05-23 #34 から統合) | 信頼性 | `infra/knowledge-base.ts`, `amplify/infra/hosting.ts`, 新規 `docs/operations.md` |
 | ~~P3~~ | ~~#34~~ | ~~Amplify Hosting 環境変数展開フローを npm script に集約~~ — **2026-05-23 「主要部分実装済み」でクローズ** (npm script 集約は PR #49 で実装済み、`npm run sandbox` + `scripts/sync-outputs-env.mjs` が等価機能。残作業の Run Book + CDK コメント補強は #33 に統合。knowledge.md 2026-05-23 参照) | 保守性 | — |
 
-着手順の推奨: ~~#28~~ (2026-05-23 完了) → ~~#29~~ (2026-05-23 クローズ、前提解消済み) → ~~#34~~ (2026-05-23 クローズ、PR #49 で実装済み + 残作業は #33 統合) → ~~#31~~ (2026-05-23 完了、PR #60) → #32 → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
+着手順の推奨: ~~#28~~ (2026-05-23 完了) → ~~#29~~ (2026-05-23 クローズ、前提解消済み) → ~~#34~~ (2026-05-23 クローズ、PR #49 で実装済み + 残作業は #33 統合) → ~~#31~~ (2026-05-23 完了、PR #60) → ~~#32~~ (2026-05-23 完了、PR #61) → #33 → #30 (実測値が必要なので 1〜2 週間データを貯めてから)。
 
 直近 close 済 (履歴): **(2026-05-08)** Nova Pro 切替 + Issue #31 部分対応 (`feature/nova-pro-migration` で PR 化予定、目視 QA OK、Ragas Run `run_20260508_152801` faith 0.65 / ar 0.39 / cp 0.64 / cr 0.20 ※judge も Nova Pro のため self-eval bias 大、参考値扱い) / **#22** Sonnet 4.6 Global 切替 (PR #23, 2026-05-05) / **#18** systemPrompt リスク階層化 (PR #24, 2026-05-05) / **#17** Ragas 評価パイプライン (PR 作成中, 2026-05-05、ベースライン faith 0.45 / ar 0.69 / cp 0.13 / cr 0.22)
 
