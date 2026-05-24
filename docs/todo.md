@@ -4,7 +4,7 @@
 
 ## 次回再開時のチェックリスト
 
-最終更新: 2026-05-23 (Issue #32 完了 — PR #61 `feature/issue-32-cognito-signup-explicit` で CDK escape hatch を追加。実機調査で `AllowAdminCreateUserOnly=false` だったため (起票時前提と異なる)、`backend.auth.resources.cfnResources.cfnUserPool.adminCreateUserConfig.allowAdminCreateUserOnly = true` で明示化。sandbox apply 73 秒 UPDATE_COMPLETE、UserPool は UPDATE (Replacement ではない) で既存ユーザー保持、`describe-user-pool` で `AllowAdminCreateUserOnly: true` 反映確認。Hosting Job #55 進行中 (完了確認別途)。同日: #31 完了 (PR #60、env 化 + 共通ヘルパー)、予算 $30→$15 引き下げ、#34/#29 クローズ。次は #33 (Bedrock KB removalPolicy 明示 + Run Book + hosting.ts コメント補強の統合 Issue) を予定 (推奨着手順: #33 → #30))
+最終更新: 2026-05-23 (Issue #31/#32 両方完了 — PR #60 (env 化 + 共通ヘルパー) と PR #61 (Cognito sign-up CDK 明示化) をマージ、Amplify Hosting Job #53/#54/#55/#56 すべて SUCCEED で本番反映確認済み。#32 では起票時前提と異なり実機調査で `AllowAdminCreateUserOnly=false` だったことが判明し escape hatch で明示化、UserPool は Replacement ではなく UPDATE で既存ユーザー保持を確認。同日: 予算 $30→$15 引き下げ (Cost Explorer 実測 $5/月)、#34/#29 クローズ。次は #33 (Bedrock KB removalPolicy 明示 + Run Book + hosting.ts コメント補強の統合 Issue) を予定 (推奨着手順: #33 → #30))
 
 ### 次回セッション開始時にやること
 
