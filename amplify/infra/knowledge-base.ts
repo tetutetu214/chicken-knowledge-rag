@@ -57,9 +57,13 @@ export const createKnowledgeBase = (
         `arn:aws:bedrock:${region}::foundation-model/${embeddingModelId}`;
 
     // S3 Vectors VectorBucket (ベクトルデータ格納用)
+    // RemovalPolicy.RETAIN を明示。Stack 削除や Replacement が起きても VectorBucket は
+    // AWS 上に残し、Bedrock KB を再構築できる経路を確保する (Issue #33)。
+    // 復旧手順は docs/operations.md「Bedrock KB 緊急時運用」参照。
     const vectorBucket = new s3vectors.CfnVectorBucket(scope, 'VectorBucket', {
         vectorBucketName: `chicken-rag-vectors-${accountId}-${region}`,
     });
+    vectorBucket.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
     // S3 Vectors Index (1024d / cosine / float32)
     // 論理ID 'VectorIndexV2' / indexName 'chicken-rag-index-v2' は metadataConfiguration 追加に伴う作り直し用。
@@ -79,6 +83,9 @@ export const createKnowledgeBase = (
         },
     });
     vectorIndex.addDependency(vectorBucket);
+    // RemovalPolicy.RETAIN を明示。Index 自体は VectorBucket 配下のメタリソースだが、
+    // CFn 上で削除/Replacement 経路をブロックして安全側に倒す (Issue #33)。
+    vectorIndex.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
     // KB サービスロールに必要な権限を ManagedPolicy として作成し、
     // roles プロパティで同時アタッチすることで「Policy作成 → アタッチ完了」を1ステップで実行。
@@ -137,6 +144,10 @@ export const createKnowledgeBase = (
     knowledgeBase.addDependency(vectorIndex);
     // KB は ManagedPolicy のアタッチ完了後に作成されるよう依存を明示
     knowledgeBase.node.addDependency(kbInvokePolicy);
+    // RemovalPolicy.RETAIN を明示。KB 自体を消すと 14 本の Ingestion (半日仕事) と
+    // Lambda env (KB_ID) の手動更新が発生する。CDK 操作ミスや Stack 削除では消えない安全側に倒す (Issue #33)。
+    // 意図的に作り直したい場合は docs/operations.md「Bedrock KB チャンキング戦略変更手順」「Embedding Model 移行手順」を参照。
+    knowledgeBase.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
     // Data Source: docsBucket を Hierarchical chunking で取り込む
     // チャンキング設定は spec.md §3-3 準拠 (parent 1500 / child 300 / overlap 60)
@@ -162,6 +173,10 @@ export const createKnowledgeBase = (
             },
         },
     });
+    // RemovalPolicy.RETAIN を明示。DataSource を消すと再 Ingestion が必要になり、
+    // 半日仕事になる。CDK 操作ミスや Stack 削除では消えない安全側に倒す (Issue #33)。
+    // チャンキング戦略変更で意図的に作り直す手順は docs/operations.md 参照。
+    dataSource.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
     return { vectorBucket, vectorIndex, knowledgeBase, dataSource };
 };
