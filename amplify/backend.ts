@@ -113,6 +113,13 @@ chatLambda.addEnvironment('MODEL_ID', conversationModelId);
 // など KB に答えがある質問でも一般知識回答に振り分けられる」報告を受け 0.7 へ戻し。0.75 は L1 一般質問
 // (実測 0.63 帯) や日常語/専門語の語彙ギャップがあるクエリ (例「首の骨」vs「頚椎」) を取りこぼし過ぎる。
 chatLambda.addEnvironment('SCORE_THRESHOLD', '0.7');
+// Query Expansion (Issue #31 派生スコープ、knowledge.md 2026-05-26 参照)
+// 取りこぼし帯 (LOWER 以上、SCORE_THRESHOLD 未満) でだけ Nova Pro リフォームを発火する
+// Conditional Retry 方式。本番投入後に救済率が低ければ ENABLED=false で完全バイパス可能。
+chatLambda.addEnvironment('QUERY_EXPANSION_ENABLED', 'true');
+chatLambda.addEnvironment('QUERY_EXPANSION_LOWER_THRESHOLD', '0.62');
+chatLambda.addEnvironment('QUERY_EXPANSION_MAX_REFORMULATIONS', '2');
+// QUERY_EXPANSION_MODEL_ID は省略 (既定で MODEL_ID = Nova Pro を流用)
 
 const chatLambdaRole = chatLambda.role;
 if (!chatLambdaRole) {

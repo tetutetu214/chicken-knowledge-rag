@@ -31,6 +31,10 @@ import {
     parseHistory,
     sanitizeHistory,
 } from './history';
+import {
+    expandIfNeeded,
+    type QueryExpansionConfig,
+} from './queryExpansion';
 import { requireEnv } from '../_shared/env';
 
 // 環境変数は Lambda 初期化時に即 throw して silently 動く事故を防ぐ (Issue #31)。
@@ -49,6 +53,36 @@ const REGION = process.env.AWS_REGION ?? 'ap-northeast-1';
 // 取りこぼすことが家族の利用ログから判明し、0.7 へ戻した。
 // 0.71 の偽陽性は別軸 (クエリ拡張・相対スコア・top1-top2 差) で対応する設計。Issue #31。
 const SCORE_THRESHOLD = Number(requireEnv('SCORE_THRESHOLD'));
+
+// Query Expansion (Issue #31 派生スコープ、knowledge.md 2026-05-26 参照)
+// 取りこぼし帯 (lowerThreshold <= topScore < upperThreshold) でだけ Nova Pro
+// リフォームを発火する Conditional Retry 方式。enabled=false で完全バイパス可。
+const QUERY_EXPANSION_CONFIG: QueryExpansionConfig = {
+    enabled:
+        (process.env.QUERY_EXPANSION_ENABLED ?? 'true').toLowerCase() === 'true',
+    lowerThreshold: Number(
+        process.env.QUERY_EXPANSION_LOWER_THRESHOLD ?? '0.62',
+    ),
+    upperThreshold: SCORE_THRESHOLD, // 既存閾値と統一
+    maxReformulations: Number(
+        process.env.QUERY_EXPANSION_MAX_REFORMULATIONS ?? '2',
+    ),
+    modelId: process.env.QUERY_EXPANSION_MODEL_ID ?? MODEL_ID,
+};
+
+// 不正設定 (LOWER >= UPPER) は init-time throw で起動を止める。
+// silently fall-through すると拡張帯が逆転して 1 件も発火しない or 全件発火と
+// なり、観測しても気付きにくいため決定的シグナルで早期検知する。
+if (
+    QUERY_EXPANSION_CONFIG.enabled
+    && QUERY_EXPANSION_CONFIG.lowerThreshold
+        >= QUERY_EXPANSION_CONFIG.upperThreshold
+) {
+    throw new Error(
+        `QUERY_EXPANSION_LOWER_THRESHOLD (${QUERY_EXPANSION_CONFIG.lowerThreshold})`
+        + ` must be less than upperThreshold (= SCORE_THRESHOLD = ${SCORE_THRESHOLD})`,
+    );
+}
 
 const agentClient = new BedrockAgentRuntimeClient({ region: REGION });
 const runtimeClient = new BedrockRuntimeClient({ region: REGION });
@@ -190,12 +224,31 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
         }),
     );
 
-    const scores = (retrieveResp.retrievalResults ?? []).map(
-        (r) => r.score ?? 0,
+    const originalResults = retrieveResp.retrievalResults ?? [];
+    const originalScores = originalResults.map((r) => r.score ?? 0);
+    const originalTopScore =
+        originalScores.length > 0 ? Math.max(...originalScores) : 0;
+    console.log(
+        'KB retrieve scores:',
+        originalScores,
+        'topScore:',
+        originalTopScore,
     );
-    const topScore = scores.length > 0 ? Math.max(...scores) : 0;
+
+    // Query Expansion: 取りこぼし帯ならリフォーム + 追加 Retrieve で救済を試みる。
+    // 拡張帯外なら expansion.results は originalResults と同一 (= 既存挙動と同じ)。
+    const expansion = await expandIfNeeded(
+        question,
+        originalResults,
+        QUERY_EXPANSION_CONFIG,
+        runtimeClient,
+        agentClient,
+        KB_ID,
+    );
+
+    const finalResults = expansion.results;
+    const topScore = expansion.topScore;
     const hasResults = topScore >= SCORE_THRESHOLD;
-    console.log('KB retrieve scores:', scores, 'topScore:', topScore);
 
     // KB ヒット時は抜粋を文字列化、citations は重複除去で構築
     let kbContext: string | undefined;
@@ -204,7 +257,7 @@ export const handler = async (event: AppSyncEvent): Promise<ChatResponse> => {
         const kbBlocks: string[] = [];
         const seen = new Set<string>();
         let sourceIdx = 1;
-        for (const r of retrieveResp.retrievalResults ?? []) {
+        for (const r of finalResults) {
             const uri = r.location?.s3Location?.uri ?? '';
             const meta = r.metadata as
                 | Record<string, unknown>
