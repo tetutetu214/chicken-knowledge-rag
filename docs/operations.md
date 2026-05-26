@@ -13,6 +13,7 @@
 3. [Embedding Model の移行手順](#3-embedding-model-の移行手順)
 4. [DataSource (docs バケット) の入れ替え手順](#4-datasource-docs-バケット-の入れ替え手順)
 5. [緊急時: Stack 削除と KB 救出](#5-緊急時-stack-削除と-kb-救出)
+6. [Lambda LogGroup 旧ログ cleanup (Issue #30 適用後)](#6-lambda-loggroup-旧ログ-cleanup-issue-30-適用後)
 
 ---
 
@@ -260,6 +261,58 @@ Stack 削除しても以下は AWS 上に残る:
 
 - `docs/knowledge.md` 2026-05-04「Sandbox を本番として共有運用 (KB 二重作成回避)」 — Stack 削除禁止の根拠
 - `docs/knowledge.md` 2026-05-02「CDK Bootstrap の孤児状態と復旧手順」 — RETAIN リソースの孤児化と復旧の一般論
+
+---
+
+## 6. Lambda LogGroup 旧ログ cleanup (Issue #30 適用後)
+
+### 6-1. 背景
+
+Issue #30 (2026-05-24) で chat-handler / summarize-handler / evaluation-handler の 3 Lambda に CloudWatch Logs Retention 90 日を設定した。Amplify Gen2 (および CDK) の `logging.retention` / `logGroup` プロパティを設定すると、CDK が**新規 LogGroup を作って Lambda がそこに書き込む**形になる。一方、Issue #30 適用前から Lambda が初回呼び出し時に自動作成していた**旧 LogGroup** (`/aws/lambda/<関数名>`) は AWS 上に残り続け、retention 未設定 (= デフォルト無期限保持) のまま孤児化する。
+
+### 6-2. 影響評価
+
+- **コスト**: CloudWatch Logs ストレージは Cost Explorer 実測で chicken-rag 全体 $0 (2026-05-23)。孤児 LogGroup を放置しても実害なし
+- **PII 観点**: 旧 LogGroup には sandbox 開発時の Lambda 実行ログ (家族の会話質問の一部が含まれる可能性) が無期限保持で残る。会話履歴 DDB が 90 日 TTL で削除されるのと整合させたいなら手動 cleanup する
+- **検索性**: ログ調査時に新旧 2 つの LogGroup を見る必要があり、混乱の元
+
+### 6-3. cleanup 手順 (任意、運用ポリシーで判断)
+
+1. **対象 LogGroup の特定**
+   ```bash
+   # 旧 LogGroup (Lambda 自動作成、retention なし) を列挙
+   aws logs describe-log-groups --region ap-northeast-1 \
+     --log-group-name-prefix /aws/lambda/ \
+     --query 'logGroups[?retentionInDays==null].[logGroupName,storedBytes]' \
+     --output table
+   ```
+   - chicken-rag 関連は `amplify-chickenknowledgerag-*-chatHandler-*` / `summarizeHandler-*` / `chicken-rag-evaluation-handler` が該当
+2. **削除前に内容を保全したい場合 (任意)**
+   ```bash
+   # 例: 直近 90 日分のログを S3 にエクスポート
+   aws logs create-export-task --log-group-name "/aws/lambda/<旧名>" \
+     --from $(date -d '90 days ago' +%s)000 --to $(date +%s)000 \
+     --destination chicken-rag-logs-archive-<accountId>-ap-northeast-1 \
+     --destination-prefix "archive/$(date +%Y%m%d)"
+   ```
+3. **旧 LogGroup の削除**
+   ```bash
+   aws logs delete-log-group --log-group-name "/aws/lambda/<旧名>" --region ap-northeast-1
+   ```
+4. **新 LogGroup (CDK 管理下、retention 90 日) が動作していることを確認**
+   - 本番で chat を 1 回投げる → AWS Console で新 LogGroup にログが流れることを目視
+   - `aws logs describe-log-groups --log-group-name-prefix amplify-chickenknowledgerag` で `retentionInDays: 90` が設定されていることを確認
+
+### 6-4. なぜ「旧 LogGroup を CDK で import する」選択肢を取らなかったか
+
+- `cdk import` で既存 LogGroup を CDK 管理下に取り込めば旧 LogGroup の retention を CDK で 90 日に設定できる。が、`cdk import` は対話操作 + 各リソースを 1 つずつ実行する必要があり、Amplify Gen2 の sandbox ワークフローと相性が悪い
+- 旧 LogGroup の手動 cleanup は数コマンドで終わるので、CDK import の複雑さに釣り合わない
+- 結果: 「Amplify Gen2 の標準挙動 (新 LogGroup 作成) に乗る + 旧 LogGroup は手動 cleanup or 放置」の方針
+
+### 6-5. 関連する過去事例
+
+- `docs/knowledge.md` 2026-05-24「Issue #30 (Lambda Logs Retention 90 日統一) 完了 — PR #X」 — 本対応の決定経緯
+- `docs/knowledge.md` 2026-05-23「月額予算上限を $30 → $15 に引き下げ」 — CloudWatch Logs コスト $0 の根拠
 
 ---
 

@@ -18,6 +18,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import {
     grantKbRetrieve,
@@ -92,6 +93,15 @@ export const createEvaluationPipeline = (
         'functions',
         'evaluation-handler',
     );
+    // CloudWatch Logs 保持期間 90 日 (Issue #30 縮小スコープ)。
+    // chat / summarize と同じく、DynamoDB 会話履歴 TTL 90 日と整合させる。
+    // logGroupName を指定せず CFn 自動命名にして、Lambda 自動作成の旧 LogGroup
+    // (/aws/lambda/chicken-rag-evaluation-handler) との衝突を回避する。
+    // 旧 LogGroup の手動 cleanup は docs/operations.md 参照。
+    const evaluationLogGroup = new logs.LogGroup(scope, 'EvaluationHandlerLogGroup', {
+        retention: logs.RetentionDays.THREE_MONTHS,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     const evaluationLambda = new lambda.DockerImageFunction(
         scope,
         'EvaluationHandler',
@@ -100,6 +110,7 @@ export const createEvaluationPipeline = (
             code: lambda.DockerImageCode.fromImageAsset(dockerContextPath),
             timeout: cdk.Duration.minutes(15),
             memorySize: 2048,
+            logGroup: evaluationLogGroup,
             environment: {
                 KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
                 MODEL_ID: props.modelId,
