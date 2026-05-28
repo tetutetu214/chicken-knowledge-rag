@@ -83,6 +83,24 @@ chicken-knowledge-rag/
 - 現場ナレッジの category は spec.md §3-3 のカテゴリ別主要トピック例の語彙を使う(育成/飼料/疾病/衛生/害獣対策/鶏小屋建築/鶏小屋設備/産卵/卵料理/個体観察/行動・福祉)。
 - 自動保存は採用しない。会話型ナレッジ蓄積（Phase 3）でも保存前のプレビュー → 承認フローを必ず挟む。
 
+## 重要な運用上の制約
+
+### 飼育地・規模情報の取り扱い
+
+このリポジトリはパブリック (`tetutetu214/chicken-knowledge-rag`) のため、CLAUDE.md・README を含むトップレベルの公開ドキュメントには羽数・小屋面積・市町村名すべてを伏せる。`docs/` 配下は規模情報の記載は OK だが、地域は「神奈川県」までに留め、市町村名はパブリックリポジトリのどこにも書かない。市町村レベルの情報は `~/.claude/projects/-home-tetutetu-projects/memory/` 配下の非公開メモリにだけ残す。
+
+「鶏の飼育地」と「ユーザーの居住地」は別物として扱う。過去に trip-road プロジェクトで両者を取り違える事故があったため、本プロジェクトで「ユーザーの自宅」を前提にした提案はしない。
+
+自治体マニュアル取り込みは神奈川県レベルを優先 (アライグマ防除実施計画など県全域カバー)。市町村固有マニュアルは S3 アップロード OK だが、PR メッセージや docs には「神奈川県内自治体」表現に留める。
+
+### Amplify Hosting の GitHub PAT は Secrets Manager 継続
+
+`amplify/infra/hosting.ts` で使う GitHub PAT は AWS Secrets Manager (`chicken-rag/github-token`) を継続利用する。SSM Parameter Store SecureString への移行は CFn 側の制約で実現不能と確定済み (Issue #26 not planned で close、2026-05-06)。
+
+理由は `AWS::Amplify::App.OauthToken` が CFn の `ssm-secure` Dynamic Reference 対応リソース表に含まれていないため (対応11リソースのみ)。aws-cdk#11858 で 2020 年から OPEN の既知問題で、CFn 側の機能追加待ち (cloudformation-coverage-roadmap#227)。回避策の Custom Resource 経由は工数 1〜2h vs 年 $5 削減で ROI 見合わず却下。
+
+他の用途で新規シークレットを追加する場合は SSM SecureString を優先候補としつつ、対象 CFn リソースが ssm-secure 対応かを事前に CFn 公式表で確認する。詳細経緯は `docs/knowledge.md` の「2026-05-06: 試行と断念 — Amplify::App.OauthToken は ssm-secure 非対応で SSM 移行不可」セクション。
+
 ## 参考: 関連ドキュメントへのリンク
 
 - 要求定義書（最も詳細な仕様）: `docs/spec.md`
