@@ -33,7 +33,7 @@
 | ベクトルストア | Amazon S3 Vectors（ap-northeast-1） |
 | RAGオーケストレーション | Amazon Bedrock Knowledge Bases |
 | Embedding | Titan Text Embeddings V2（1024次元 cosine） |
-| 回答生成LLM | Claude Sonnet 4.5（メイン）/ Claude Haiku 4.5（軽量質問用） |
+| 回答生成LLM | Amazon Nova Pro（`apac.amazon.nova-pro-v1:0`、Converse API 経由）/ 2026-05-08 にコスト理由で Claude Sonnet 4.6 + Haiku 4.5 から完全移行（戻りなし）。詳細は `docs/knowledge.md` の 2026-05-08 セクション参照 |
 | 会話バックエンド | AWS Amplify Gen2 + AI Kit（`a.conversation()`） |
 | 認証 | Amazon Cognito User Pool（家族のみ） |
 | 会話履歴 | Amazon DynamoDB（Single Table Design・ULID・TTL 90日） |
