@@ -124,7 +124,7 @@ KB 拡充の経路 [3] の出口。Phase 1 (`topScore` の DDB 保存) は PR #2
 ### スコープ
 
 - ブランチ: `feature/insights-dashboard`
-- 新規ページ: `web/app/insights/page.tsx` (家族メンバー のサインインを前提、`app/layout.tsx` の Authenticator wrap に乗る)
+- 新規ページ: `web/app/insights/page.tsx` (家族メンバーのサインインを前提、`app/layout.tsx` の Authenticator wrap に乗る)
 - 既存サイドバーから `/insights` への導線を追加 (`web/app/page.tsx`)
 - 単体テスト + Playwright E2E + docs 更新を含めて 1 PR で完結
 
