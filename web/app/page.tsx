@@ -422,21 +422,6 @@ export default function Home() {
             >
                 ☰
             </button>
-            {/*
-              スマホ用: サインアウトボタン (md未満で表示)。
-              左ペイン下部のサインアウトは fixed なサイドバー内にあり、
-              iPhone Safari / Chrome の下部ブラウザ UI に被ってタップ
-              できない問題があるため、画面右上にも常時表示する。
-              ハンバーガーボタン(左上)と対称位置に置く。
-            */}
-            <button
-                type="button"
-                onClick={signOut}
-                className="md:hidden fixed top-3 right-3 z-40 px-3 py-2 bg-white dark:bg-zinc-800 rounded-md shadow border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-200 min-h-11"
-                aria-label="サインアウト"
-            >
-                サインアウト
-            </button>
             {/* スマホ用: サイドバー展開時の背景オーバーレイ。タップで閉じる */}
             {sidebarOpen && (
                 <div
@@ -458,6 +443,26 @@ export default function Home() {
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         にわとり飼育アシスタント　コケ先輩
                     </p>
+                </div>
+                {/*
+                  アカウント欄 (ユーザー名 + サインアウト)。
+                  2026-05-31: 旧構成では (a) サイドバー下部固定 と (b) 画面右上フロート の
+                  2か所にサインアウトが散らばっていた。フロートは「常に1つだけ浮いていて
+                  邪魔／誤タップしやすい」ためモバイル右上フロートを廃止し、サインアウトは
+                  ここ1か所に集約した。ヘッダー直下に置くことで、サイドバー下端が iPhone の
+                  下部ツールバーに被って押せない問題 (旧構成でフロートを足した元の理由) も解消する。
+                */}
+                <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                        👤 {user?.signInDetails?.loginId ?? user?.username}
+                    </span>
+                    <button
+                        onClick={signOut}
+                        className="shrink-0 px-2 min-h-11 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        aria-label="サインアウト"
+                    >
+                        サインアウト
+                    </button>
                 </div>
                 <button
                     onClick={() => {
@@ -616,27 +621,6 @@ export default function Home() {
                                 );
                             })}
                     </div>
-                </div>
-                <div
-                    className={[
-                        'p-3 border-t border-zinc-200 dark:border-zinc-800',
-                        'text-xs text-zinc-500 dark:text-zinc-400',
-                        // iPhone Safari / Chrome のボトムツールバー (戻る/進む/タブ/メニュー
-                        // = 約 56pt) と画面下端のセーフエリアを確保しないと、左ペイン下端の
-                        // サインアウトボタンがブラウザ UI に覆われてタップできない。
-                        // モバイル幅 (md 未満) のときだけ余白を増やす。
-                        'pb-[calc(env(safe-area-inset-bottom)+4rem)] md:pb-3',
-                    ].join(' ')}
-                >
-                    <div className="truncate mb-1">
-                        {user?.signInDetails?.loginId ?? user?.username}
-                    </div>
-                    <button
-                        onClick={signOut}
-                        className="text-blue-600 dark:text-blue-400 hover:underline min-h-11"
-                    >
-                        サインアウト
-                    </button>
                 </div>
             </aside>
 
