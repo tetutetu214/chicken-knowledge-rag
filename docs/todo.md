@@ -1,5 +1,10 @@
 # タスク管理 — Chicken Knowledge RAG System
 
+## 次の一手 <!-- next-move: 2026-07-12 -->
+- Issue #1 誤起票（別リポジトリ内容の混入）の処置判断
+- feature/query-expansion-issue-31 の続行/破棄判断
+- todo.md の Scheduler 記述矛盾の解消（要 aws login）
+
 最新状態を保つこと。完了したらチェックを入れて、必要なら新規タスクを追加する。詳細は `spec.md` §9 を参照。
 
 ## 次回再開時のチェックリスト
